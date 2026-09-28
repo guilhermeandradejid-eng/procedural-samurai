@@ -45,6 +45,10 @@ func save_game() -> void:
 func reset() -> void:
 	for k in ["cleared_camps", "discovered", "prayed_shrines", "bathed_onsen", "haiku_done"]:
 		data[k] = []
+	for k in data.keys():
+		if String(k).begins_with("used_"):
+			data[k] = []
+	data.erase("respawn")
 	data.max_health_bonus = 0
 	data.resolve_bonus = 0
 	data.kills = 0

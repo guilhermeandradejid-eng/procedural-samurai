@@ -53,7 +53,7 @@ func nearest_uncleared(from: Vector3) -> Dictionary:
 
 
 func _process(delta: float) -> void:
-	var player := Game.player as Player
+	var player := Game.get_player()
 	if player == null or data == null:
 		return
 	var pp := player.global_position
@@ -92,7 +92,7 @@ func _on_camp_cleared(enc: Encounter) -> void:
 	Game.camp_cleared.emit(enc.id)
 	Game.show_banner("ACAMPAMENTO LIBERTADO", String(enc.poi.get("name", "")), "victory")
 	Audio.play("victory_sting", 0.0)
-	var player := Game.player as Player
+	var player := Game.get_player()
 	if player:
 		player.add_resolve_charge(1.0)
 
@@ -102,10 +102,14 @@ func _spawn_camp(p: Dictionary, alive_count: int) -> Encounter:
 	enc.id = p.id
 	enc.poi = p
 	enc.kind = "camp"
-	add_child(enc)
 	var c := Vector3(float(p.x), 0.0, float(p.z))
 	c.y = data.get_height(c.x, c.z)
-	enc.global_position = c
+	enc.position = c
+	add_child(enc)
+	# make sure trees/rocks around the camp have collision before bodies land
+	var world := Game.world as World
+	if world and world.forest:
+		world.forest.update_physics_around(c)
 	enc.cleared.connect(_on_camp_cleared)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(p.id)
@@ -140,7 +144,7 @@ func _spawn_camp(p: Dictionary, alive_count: int) -> Encounter:
 			rad = 2.6
 		var pos := c + Vector3(cos(ang), 0.0, sin(ang)) * rad
 		pos.y = data.get_height(pos.x, pos.z) + 0.05
-		e.position = pos
+		e.position = pos - c   # local to the encounter node placed at the camp centre
 		var face := (c - pos) if mode in ["fire", "sit"] else (pos - c)
 		face.y = 0.0
 		e.rotation.y = atan2(-face.x, -face.z)
@@ -189,8 +193,8 @@ func _update_patrol(delta: float, pp: Vector3) -> void:
 		var enc := Encounter.new()
 		enc.kind = "patrol"
 		enc.id = "patrol"
+		enc.position = start
 		add_child(enc)
-		enc.global_position = start
 		var route: Array[Vector3] = []
 		for k in range(i, mini(i + 40, pts.size())):
 			var q := Vector3(float(pts[k][0]), 0.0, float(pts[k][1]))
@@ -203,7 +207,7 @@ func _update_patrol(delta: float, pp: Vector3) -> void:
 			e.seed = _rng.randi()
 			var pos := start + Vector3(m * 1.3, 0.0, m * 0.8)
 			pos.y = data.get_height(pos.x, pos.z) + 0.05
-			e.position = pos
+			e.position = pos - start
 			e.idle_mode = "patrol"
 			e.patrol_points = route.duplicate()
 			enc.add_child(e)

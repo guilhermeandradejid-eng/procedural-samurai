@@ -23,7 +23,23 @@ var values := {
 	"camera_shake": 1.0,
 	"show_hud": true,
 	"day_length_minutes": 36.0,
+	"difficulty": 1,   # 0 historia, 1 normal, 2 dificil, 3 letal
+	"kurosawa": false,
+	"subtitles": true,
 }
+
+const DIFFICULTY_NAMES := ["História", "Normal", "Difícil", "Letal"]
+## enemy damage multiplier and enemy aggression per difficulty
+const DIFFICULTY := [
+	{"enemy_damage": 0.45, "aggression": 0.75, "tokens": 1},
+	{"enemy_damage": 0.75, "aggression": 1.0, "tokens": 2},
+	{"enemy_damage": 1.0, "aggression": 1.2, "tokens": 2},
+	{"enemy_damage": 2.2, "aggression": 1.35, "tokens": 3},
+]
+
+
+func difficulty() -> Dictionary:
+	return DIFFICULTY[clampi(int(values.get("difficulty", 1)), 0, 3)]
 
 
 func _ready() -> void:
@@ -61,17 +77,17 @@ func save_settings() -> void:
 func quality() -> Dictionary:
 	var q: int = clampi(int(values.quality), 0, 3)
 	var presets := [
-		{"grass_near": 110, "grass_far": 70, "pampas": 90, "flowers": 60, "tree_lod0": 60.0, "tree_lod1": 260.0,
-			"tree_far": 900.0, "shadow_distance": 140.0, "shadow_splits": 2, "ssao": false, "ssil": false,
+		{"grass_near": 110, "grass_far": 70, "pampas": 90, "flowers": 60, "tree_lod0": 55.0, "tree_lod1": 150.0,
+			"tree_far": 900.0, "rock_far": 220.0, "shadow_distance": 140.0, "shadow_splits": 2, "ssao": false, "ssil": false,
 			"volumetric_fog": false, "glow": true, "shadow_size": 2048, "decals": 40, "sss": false},
-		{"grass_near": 150, "grass_far": 90, "pampas": 120, "flowers": 80, "tree_lod0": 80.0, "tree_lod1": 340.0,
-			"tree_far": 1200.0, "shadow_distance": 180.0, "shadow_splits": 4, "ssao": true, "ssil": false,
+		{"grass_near": 150, "grass_far": 90, "pampas": 120, "flowers": 80, "tree_lod0": 70.0, "tree_lod1": 190.0,
+			"tree_far": 1200.0, "rock_far": 300.0, "shadow_distance": 180.0, "shadow_splits": 4, "ssao": true, "ssil": false,
 			"volumetric_fog": true, "glow": true, "shadow_size": 4096, "decals": 80, "sss": true},
-		{"grass_near": 200, "grass_far": 120, "pampas": 150, "flowers": 100, "tree_lod0": 100.0, "tree_lod1": 420.0,
-			"tree_far": 1600.0, "shadow_distance": 240.0, "shadow_splits": 4, "ssao": true, "ssil": false,
+		{"grass_near": 200, "grass_far": 120, "pampas": 150, "flowers": 100, "tree_lod0": 90.0, "tree_lod1": 240.0,
+			"tree_far": 1600.0, "rock_far": 380.0, "shadow_distance": 240.0, "shadow_splits": 4, "ssao": true, "ssil": false,
 			"volumetric_fog": true, "glow": true, "shadow_size": 4096, "decals": 140, "sss": true},
-		{"grass_near": 256, "grass_far": 160, "pampas": 190, "flowers": 128, "tree_lod0": 130.0, "tree_lod1": 520.0,
-			"tree_far": 2000.0, "shadow_distance": 320.0, "shadow_splits": 4, "ssao": true, "ssil": true,
+		{"grass_near": 256, "grass_far": 160, "pampas": 190, "flowers": 128, "tree_lod0": 120.0, "tree_lod1": 320.0,
+			"tree_far": 2200.0, "rock_far": 480.0, "shadow_distance": 320.0, "shadow_splits": 4, "ssao": true, "ssil": true,
 			"volumetric_fog": true, "glow": true, "shadow_size": 8192, "decals": 220, "sss": true},
 	]
 	return presets[q]

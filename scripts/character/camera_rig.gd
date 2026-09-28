@@ -43,6 +43,7 @@ func _ready() -> void:
 	_query.shape = _shape
 	_query.collision_mask = 1
 	Game.shake_requested.connect(add_trauma)
+	Game.kill_cam_requested.connect(_kill_cam)
 	Game.camera_rig = self
 	Settings.changed.connect(func(_k: String) -> void: base_fov = float(Settings.get_value("fov", 72.0)))
 	base_fov = float(Settings.get_value("fov", 72.0))
@@ -78,6 +79,29 @@ func _unhandled_input(event: InputEvent) -> void:
 func cinematic(xf: Transform3D, duration: float, fov := 55.0, follow: Node3D = null) -> void:
 	_cine = {"xf": xf, "time": duration, "fov": fov, "follow": follow, "offset": xf.origin - (follow.global_position if follow else Vector3.ZERO)}
 	_cine_blend = 0.0
+
+
+## Side-on low shot framing the killer and the falling victim.
+func _kill_cam(victim: Node3D, duration: float) -> void:
+	if target == null or not is_instance_valid(victim):
+		return
+	var a := target.global_position
+	var b := victim.global_position
+	var mid := (a + b) * 0.5 + Vector3(0, 1.1, 0)
+	var line := b - a
+	line.y = 0.0
+	if line.length() < 0.1:
+		line = -target.global_basis.z
+	var side := line.normalized().cross(Vector3.UP)
+	# pick the side that keeps the camera closer to the current view
+	if side.dot(cam.global_position - mid) < 0.0:
+		side = -side
+	var pos := mid + side * 3.4 + Vector3(0, -0.35, 0) - line.normalized() * 0.6
+	var wd := WorldData.current
+	if wd:
+		pos.y = maxf(pos.y, wd.get_height(pos.x, pos.z) + 0.4)
+	var xf := Transform3D(Basis(), pos).looking_at(mid, Vector3.UP)
+	cinematic(xf, duration, 48.0)
 
 
 func end_cinematic() -> void:

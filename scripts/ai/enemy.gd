@@ -62,6 +62,7 @@ func _ready() -> void:
 			block_chance = 0.25
 		_:
 			block_chance = 0.3
+	aggression *= float(Settings.difficulty().aggression)
 	super._ready()
 	add_to_group("enemies")
 	home = global_position
@@ -79,7 +80,7 @@ func _ready() -> void:
 # ------------------------------------------------------------------ AI
 
 func _think(delta: float) -> void:
-	var player := Game.player as Player
+	var player := Game.get_player()
 	if player == null or not is_instance_valid(player):
 		return
 	_think_timer -= delta
@@ -357,6 +358,21 @@ func _steer(dir: Vector3, speed: float) -> void:
 
 # ------------------------------------------------------------------ hooks
 
+func damage_multiplier() -> float:
+	return float(Settings.difficulty().enemy_damage)
+
+
+func _attack_target() -> Character:
+	var p: Character = Game.get_player()
+	if p and not p.dead and state == State.COMBAT and p.global_position.distance_to(global_position) < 5.0:
+		return p
+	return null
+
+
+func max_lunge() -> float:
+	return 1.0 if style != "spearman" else 0.6
+
+
 func _update_action(delta: float) -> void:
 	# enemies swing a little slower than the player so moves stay readable
 	if action == "attack":
@@ -388,6 +404,25 @@ func receive_hit(info: Dictionary) -> String:
 	if r == "hit" and _pending_attack != "":
 		_pending_attack = ""
 	return r
+
+
+func die(info: Dictionary) -> void:
+	if dead:
+		return
+	super.die(info)
+	SaveGame.data.kills = int(SaveGame.data.get("kills", 0)) + 1
+	Game.enemy_killed.emit(self, info)
+	var player := Game.get_player()
+	if player == null or not (info.get("attacker") is Player):
+		return
+	player.add_resolve_charge(0.34 if body.severed.is_empty() else 0.5)
+	# kill cam: the last foe of a fight falls in slow motion
+	var last := true
+	if encounter:
+		last = (encounter as Encounter).alive().is_empty()
+	if last or info.get("attack", "") in ["iai", "assassinate"]:
+		Game.slowmo(1.5, 0.18)
+		Game.kill_cam_requested.emit(self, 1.4)
 
 
 func _on_part_severed(part: String, stump: String) -> void:

@@ -10,6 +10,13 @@ global uniform float wind_time;
 global uniform float guide_wind;
 global uniform float wetness;
 global uniform float snow_amount;
+global uniform vec3 lod_center;
+
+// Per-instance LOD band (MultiMesh chunks): an instance is drawn only while
+// its distance to the camera lies inside [x, y]; the edges cross-fade with a
+// complementary dither so LOD levels swap without popping.
+instance uniform vec2 lod_band = vec2(0.0, 1000000.0);
+const float LOD_FADE = 10.0;
 
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap;
@@ -24,6 +31,7 @@ uniform float uv_scale_v = 1.0;
 
 varying float v_occl;
 varying float v_var;
+varying vec2 v_fade;
 
 float hash11(float n) {
 	return fract(sin(n * 127.1) * 43758.5453);
@@ -31,6 +39,12 @@ float hash11(float n) {
 
 void vertex() {
 	vec3 root = MODEL_MATRIX[3].xyz;
+	float lod_d = length(root.xz - lod_center.xz);
+	v_fade = vec2(lod_band.x <= 0.0 ? 1.0 : clamp((lod_d - lod_band.x) / LOD_FADE + 0.5, 0.0, 1.0),
+		clamp((lod_band.y - lod_d) / LOD_FADE + 0.5, 0.0, 1.0));
+	if (min(v_fade.x, v_fade.y) <= 0.0) {
+		VERTEX = vec3(0.0);   // outside this level's band: collapse the instance
+	}
 	float inst = hash11(dot(root, vec3(0.13, 0.71, 0.37)));
 	float sway_w = COLOR.r * sway_amount;
 	float phase = COLOR.g * 6.2831 + inst * 6.2831;
@@ -50,6 +64,12 @@ void vertex() {
 }
 
 void fragment() {
+	if (min(v_fade.x, v_fade.y) < 0.999) {
+		float nz = fract(sin(dot(floor(FRAGCOORD.xy), vec2(12.9898, 78.233))) * 43758.5453);
+		if (nz > v_fade.y || 1.0 - nz > v_fade.x) {
+			discard;
+		}
+	}
 	vec2 uv = UV;
 	if (!is_leaf) {
 		uv.y *= uv_scale_v;

@@ -112,6 +112,25 @@ func play_at(name: String, pos: Vector3, volume_db := 0.0, pitch_var := 0.08, ma
 	return p
 
 
+## Attaches a looping positional sound (camp fire, onsen water...) to
+## `parent`; it plays while the parent is in the tree.
+func attach_loop(name: String, parent: Node3D, volume_db := 0.0, max_dist := 30.0) -> AudioStreamPlayer3D:
+	var s: AudioStream = ambience.get(name, null)
+	if s == null:
+		s = _pick(name)
+	if s == null:
+		return null
+	var p := AudioStreamPlayer3D.new()
+	p.stream = s
+	p.bus = "Ambience"
+	p.volume_db = volume_db
+	p.max_distance = max_dist
+	p.unit_size = 4.0
+	p.autoplay = true
+	parent.add_child(p)
+	return p
+
+
 ## Plays a non-positional one-shot (UI, stingers).
 func play(name: String, volume_db := 0.0, pitch_var := 0.0, bus := "SFX") -> AudioStreamPlayer:
 	var s := _pick(name)

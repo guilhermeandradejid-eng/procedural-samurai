@@ -107,6 +107,7 @@ GLOBALS = [
     ("wind_time", "float", "0.0"),
     ("guide_wind", "float", "0.0"),
     ("player_pos", "vec3", "Vector3(0, 0, 0)"),
+    ("lod_center", "vec3", "Vector3(0, 0, 0)"),
     ("trample_0", "vec4", "Vector4(0, -1000, 0, 0)"),
     ("trample_1", "vec4", "Vector4(0, -1000, 0, 0)"),
     ("trample_2", "vec4", "Vector4(0, -1000, 0, 0)"),

@@ -66,7 +66,7 @@ func on_attack(_e: Enemy) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var player := Game.player as Player
+	var player := Game.get_player()
 	if player == null:
 		return
 	_token_timer -= delta
@@ -87,7 +87,7 @@ func _physics_process(delta: float) -> void:
 	_calm_timer = 0.0
 	fighters.sort_custom(func(a: Enemy, b: Enemy) -> bool:
 		return a.global_position.distance_squared_to(player.global_position) < b.global_position.distance_squared_to(player.global_position))
-	var budget := max_tokens
+	var budget := max_tokens + int(Settings.difficulty().tokens) - 2
 	for e in fighters:
 		var cost := 2 if e.style in ["brute", "leader"] else 1
 		var give := budget >= cost and e.global_position.distance_to(player.global_position) < 9.0

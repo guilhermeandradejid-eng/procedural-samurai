@@ -271,6 +271,19 @@ func receive_hit(info: Dictionary) -> String:
 	return r
 
 
+func _attack_target() -> Character:
+	var t: Character = lock_target if lock_target else soft_target
+	if t == null or t.dead:
+		t = _find_target(4.5, 0.1, -global_basis.z)
+	if t and t.global_position.distance_to(global_position) < 5.0:
+		return t
+	return null
+
+
+func max_lunge() -> float:
+	return 2.6
+
+
 func damage_multiplier() -> float:
 	return 1.0
 

@@ -17,6 +17,9 @@ var wind: Wind
 var weather: Weather
 var water: Water
 var grass: GrassSystem
+var forest: Forest
+var settlements: Settlements
+var population: Population
 var is_built := false
 
 
@@ -35,6 +38,18 @@ func build() -> void:
 	grass.name = "Grass"
 	add_child(grass)
 	grass.build()
+	forest = Forest.new()
+	forest.name = "Forest"
+	add_child(forest)
+	forest.build(data)
+	settlements = Settlements.new()
+	settlements.name = "Settlements"
+	add_child(settlements)
+	settlements.build(data)
+	population = Population.new()
+	population.name = "Population"
+	add_child(population)
+	population.setup(data)
 	is_built = true
 	built.emit()
 

@@ -131,10 +131,11 @@ def kanabo():
 
 def yari():
     B = Builder()
-    lathe(B, [(-1.3, 0.016), (-1.28, 0.02), (0.7, 0.018), (0.72, 0.022), (0.76, 0.02)], "wood_dark", sides=8, uv_scale=3.0)
+    # held near the butt so the spear out-ranges the swords (grip at y=0)
+    lathe(B, [(-0.62, 0.016), (-0.6, 0.02), (1.3, 0.018), (1.32, 0.022), (1.36, 0.02)], "wood_dark", sides=8, uv_scale=3.0)
     ob = B.to_object("yari_shaft")
     S = Builder()
-    blade(S, 0.76, 0.26, 0.034, 0.0, thickness=0.012, stations=12, tip=0.12)
+    blade(S, 1.36, 0.28, 0.034, 0.0, thickness=0.012, stations=12, tip=0.12)
     tip = S.to_object("yari_tip")
     ob = blib.join([ob, tip], "yari")
     set_origin(ob, (0.0, 0.0, 0.0))

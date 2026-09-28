@@ -34,6 +34,13 @@ var _last_ticks := 0
 var _paused_scale := 1.0
 
 
+## The live player character, or null (never a freed instance).
+func get_player() -> Player:
+	if player == null or not is_instance_valid(player):
+		return null
+	return player as Player
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	rng.randomize()

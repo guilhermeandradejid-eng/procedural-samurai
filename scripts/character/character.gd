@@ -45,6 +45,10 @@ var gravity_accel := 17.0
 var accel_ground := 32.0
 var accel_air := 5.0
 var external_velocity := Vector3.ZERO
+var attack_target: Character = null
+var attack_step := 0.0
+var attack_step_window := Vector2.ZERO
+var _loco := Vector3.ZERO   # locomotion part of the horizontal velocity
 var landed := 0.0
 var _was_on_floor := true
 var _fall_speed := 0.0
@@ -178,16 +182,23 @@ func _move(delta: float) -> void:
 		var target := Vector3(p.x, global_position.y, p.z)
 		velocity = (target - global_position) / maxf(delta, 1e-3)
 		velocity.y -= gravity_accel * delta
+		_loco = Vector3.ZERO
 		move_and_slide()
 		return
 	var desired := move_dir * move_speed
 	var locked := action in ["hit", "stagger", "getup", "heal", "parry", "chiburi", "pray", "sit", "kneel", "standoff", "iai_ready"]
 	if action == "attack":
 		desired *= 0.15
-		var sw: Array = attack.get("step_window", [0.0, 0.0])
-		if action_time >= sw[0] and action_time <= sw[1] and sw[1] > sw[0]:
-			var step_speed: float = float(attack.get("step", 0.0)) / (sw[1] - sw[0])
-			desired += -global_basis.z * step_speed
+		var sw := attack_step_window
+		if action_time >= sw.x and action_time <= sw.y and sw.y > sw.x:
+			var step_speed: float = attack_step / (sw.y - sw.x)
+			var fwd := -global_basis.z
+			if attack_target and is_instance_valid(attack_target) and not attack_target.dead:
+				var to := attack_target.global_position - global_position
+				to.y = 0.0
+				if to.length() > 0.2:
+					fwd = to.normalized()
+			desired += fwd * step_speed
 	elif action == "roll":
 		var k := clampf(action_time / ROLL_TIME, 0.0, 1.0)
 		desired = roll_dir * (ROLL_DISTANCE / ROLL_TIME) * (1.4 - k * 0.9)
@@ -195,14 +206,16 @@ func _move(delta: float) -> void:
 		desired *= 0.45
 	elif locked:
 		desired = Vector3.ZERO
-	var hv := Vector3(velocity.x, 0.0, velocity.z)
 	var acc := accel_ground if is_on_floor() else accel_air
 	if action == "roll" or (action == "attack"):
 		acc = 60.0
-	hv = hv.move_toward(desired, acc * delta)
+	if action == "attack" and action_time >= attack_step_window.x and action_time <= attack_step_window.y:
+		_loco = desired   # the lunge is exact so the swing lands where aimed
+	else:
+		_loco = _loco.move_toward(desired, acc * delta)
 	external_velocity = external_velocity.lerp(Vector3.ZERO, clampf(delta * 5.0, 0.0, 1.0))
-	velocity.x = hv.x + external_velocity.x
-	velocity.z = hv.z + external_velocity.z
+	velocity.x = _loco.x + external_velocity.x
+	velocity.z = _loco.z + external_velocity.z
 	if is_on_floor():
 		if velocity.y < 0.0:
 			velocity.y = -1.0
@@ -210,6 +223,11 @@ func _move(delta: float) -> void:
 		velocity.y -= gravity_accel * delta
 		_fall_speed = maxf(_fall_speed, -velocity.y)
 	move_and_slide()
+	if get_slide_collision_count() > 0:
+		# walls eat locomotion speed so it does not build up against them
+		var real := Vector3(velocity.x, 0.0, velocity.z) - external_velocity
+		if real.length() < _loco.length():
+			_loco = real
 	var on_floor := is_on_floor()
 	if on_floor and not _was_on_floor:
 		_on_landed(_fall_speed)
@@ -220,13 +238,26 @@ func _move(delta: float) -> void:
 		var target_yaw := atan2(-face_dir.x, -face_dir.z)
 		var rate := turn_rate
 		if action == "attack":
-			rate = 4.0 if action_time < float(attack.get("active", [0.2])[0]) else 0.6
+			rate = 9.0 if action_time < float(attack.get("active", [0.2])[0]) else 0.6
+			if attack_target and is_instance_valid(attack_target) and not attack_target.dead:
+				var tt := attack_target.global_position - global_position
+				if tt.length_squared() > 0.04:
+					target_yaw = atan2(-tt.x, -tt.z)
 		rotation.y = lerp_angle(rotation.y, target_yaw, clampf(rate * delta, 0.0, 1.0))
 	# keep the body from being left behind if the capsule got teleported
 	if global_position.distance_squared_to(body.parts["pelvis"].global_position) > 36.0 and not dead:
 		animator.initialized = false
 		animator.update(delta, anim_state())
 		body.snap_to_targets()
+
+
+func on_footstep(pos: Vector3, speed: float) -> void:
+	if dead or crouching and speed < 2.5:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.global_position.distance_squared_to(pos) > 900.0:
+		return
+	Audio.play_at("step", pos, lerpf(-22.0, -9.0, clampf(speed / 7.0, 0.0, 1.0)), 0.12, 30.0)
 
 
 func _on_landed(fall_speed: float) -> void:
@@ -277,8 +308,44 @@ func start_attack(name: String) -> bool:
 	attack = a
 	set_action("attack", float(a.duration))
 	_sweep_sound_done = false
+	aim_attack_at(_attack_target())
 	attack_started.emit(self, a)
 	return true
+
+
+## Magnetism: the lunge of the current attack covers the gap to `target`
+## (Ghost of Tsushima style), so swings connect without pixel-perfect spacing.
+func aim_attack_at(target: Character) -> void:
+	attack_target = target
+	attack_step = float(attack.get("step", 0.0))
+	var sw: Array = attack.get("step_window", [0.0, 0.0])
+	attack_step_window = Vector2(sw[0], sw[1])
+	if target == null:
+		return
+	var to := target.global_position - global_position
+	to.y = 0.0
+	var ideal := strike_distance()
+	attack_step = clampf(to.length() - ideal, 0.0, max_lunge())
+	# the lunge must finish just before the blade crosses the front
+	var act: Array = attack.get("active", [0.2, 0.3])
+	var strike := float(attack.get("strike", lerpf(act[0], act[1], 0.45)))
+	attack_step_window = Vector2(minf(sw[0], strike * 0.3), maxf(strike - 0.03, 0.05))
+	if to.length() > 0.2:
+		face_dir = to.normalized()
+
+
+## Distance between the two characters at which the current move cuts best.
+func strike_distance() -> float:
+	return float(attack.get("ideal", AttackLibrary.WEAPONS.get(weapon_kind, {}).get("ideal", 1.0))) * scale_factor
+
+
+## Target the current attack homes in on (null = straight ahead).
+func _attack_target() -> Character:
+	return null
+
+
+func max_lunge() -> float:
+	return 1.2
 
 
 func draw_weapon(instant := false) -> void:

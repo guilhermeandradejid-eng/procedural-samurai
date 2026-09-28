@@ -401,7 +401,7 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 				var ideal := root.origin + hvel * remaining + root.basis.x * (0.12 * f.side * s)
 				var g := _ground(ideal, root.origin.y)
 				f.to = g[0]
-				f.normal = f.normal.slerp(g[1], 0.3)
+				f.normal = f.normal.lerp(g[1], 0.3).normalized()
 				var e := AttackLibrary.ease_curve(t, "inout")
 				var lift := lerpf(0.1, 0.22, sprintiness) * s
 				f.pos = f.from.lerp(f.to, e) + Vector3(0, lift * sin(t * PI), 0)
@@ -411,6 +411,8 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 				if not f.planted:
 					f.pos = f.to
 					f.planted = true
+					if ch.has_method("on_footstep"):
+						ch.on_footstep(f.pos, speed)
 				f.t = 1.0
 	else:
 		# standing: re-step feet that are too far from where they should be

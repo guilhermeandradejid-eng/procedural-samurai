@@ -8,10 +8,10 @@ extends RefCounted
 
 ## Weapon-specific data: resting guard pose, reach and hand placement.
 const WEAPONS := {
-	"katana": {"left_hand": -0.16, "reach": 1.0, "blade_start": 0.05, "blade_end": 0.75, "guard": "guard_katana", "two_handed": true, "mass": 1.2},
-	"nodachi": {"left_hand": -0.26, "reach": 1.4, "blade_start": 0.05, "blade_end": 1.12, "guard": "guard_katana", "two_handed": true, "mass": 2.4},
-	"kanabo": {"left_hand": -0.2, "reach": 1.2, "blade_start": 0.2, "blade_end": 0.95, "guard": "guard_kanabo", "two_handed": true, "mass": 4.0},
-	"yari": {"left_hand": 0.5, "reach": 2.2, "blade_start": 0.7, "blade_end": 1.02, "guard": "guard_yari", "two_handed": true, "mass": 2.0},
+	"katana": {"left_hand": -0.16, "reach": 1.0, "ideal": 1.05, "blade_start": 0.05, "blade_end": 0.75, "guard": "guard_katana", "two_handed": true, "mass": 1.2},
+	"nodachi": {"left_hand": -0.26, "reach": 1.4, "ideal": 1.35, "blade_start": 0.05, "blade_end": 1.12, "guard": "guard_katana", "two_handed": true, "mass": 2.4},
+	"kanabo": {"left_hand": -0.2, "reach": 1.2, "ideal": 1.2, "blade_start": 0.2, "blade_end": 0.95, "guard": "guard_kanabo", "two_handed": true, "mass": 4.0},
+	"yari": {"left_hand": 0.55, "reach": 2.2, "ideal": 1.9, "blade_start": 1.25, "blade_end": 1.64, "guard": "guard_yari", "two_handed": true, "mass": 2.0},
 }
 
 const SHEATH_GRIP := Vector3(-0.19, 0.99, -0.16)
@@ -198,7 +198,7 @@ static func _build() -> void:
 			key(0.8, yg.pos, yg.dir, yg.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["spear_sweep"] = {
-		"name": "spear_sweep", "duration": 1.0, "active": [0.42, 0.6], "damage": 18.0, "guard_damage": 20.0,
+		"name": "spear_sweep", "duration": 1.0, "active": [0.42, 0.6], "damage": 18.0, "guard_damage": 20.0, "ideal": 1.45,
 		"step": 0.3, "step_window": [0.4, 0.55], "cancel": 0.85, "swing_time": 0.4, "hitstop": 0.07,
 		"cut": "crush", "power": 1.3,
 		"keys": [yg,
@@ -259,7 +259,7 @@ static func sample(keys: Array, t: float) -> Dictionary:
 	var pos: Vector3 = _cr(k0.pos, k1.pos, k2.pos, k3.pos, u)
 	var dir: Vector3 = (_cr(k0.dir, k1.dir, k2.dir, k3.dir, u) as Vector3).normalized()
 	if dir.length_squared() < 0.5:
-		dir = k1.dir.slerp(k2.dir, u)
+		dir = k1.dir if u < 0.5 else k2.dir
 	var edge: Vector3 = _cr(k0.edge, k1.edge, k2.edge, k3.edge, u)
 	edge = (edge - dir * edge.dot(dir)).normalized()
 	return {

@@ -14,11 +14,20 @@ uniform int moss_layer = 0;
 
 global uniform float wetness;
 global uniform float snow_amount;
+global uniform vec3 lod_center;
+
+instance uniform vec2 lod_band = vec2(0.0, 1000000.0);
 
 varying vec3 v_wpos;
 varying vec3 v_wnrm;
+varying float v_fade;
 
 void vertex() {
+	float lod_d = length(MODEL_MATRIX[3].xz - lod_center.xz);
+	v_fade = clamp((lod_band.y - lod_d) / 12.0 + 0.5, 0.0, 1.0);
+	if (v_fade <= 0.0) {
+		VERTEX = vec3(0.0);
+	}
 	v_wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	v_wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
@@ -30,6 +39,9 @@ vec4 tri(sampler2DArray t, vec3 p, vec3 w, int layer) {
 }
 
 void fragment() {
+	if (v_fade < 0.999 && fract(sin(dot(floor(FRAGCOORD.xy), vec2(12.9898, 78.233))) * 43758.5453) > v_fade) {
+		discard;
+	}
 	vec3 n = normalize(v_wnrm);
 	vec3 w = pow(abs(n), vec3(4.0));
 	w /= (w.x + w.y + w.z);
