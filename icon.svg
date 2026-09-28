@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#f3e7cf"/>
+      <stop offset="1" stop-color="#c9b48d"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="45%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#e2412f"/>
+      <stop offset="1" stop-color="#a51f17"/>
+    </radialGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="36" fill="url(#bg)"/>
+  <circle cx="150" cy="104" r="62" fill="url(#sun)"/>
+  <!-- volcano -->
+  <path d="M8 206 L96 150 Q128 128 160 150 L248 206 L248 212 Q248 248 212 248 L44 248 Q8 248 8 212 Z" fill="#2a2522"/>
+  <path d="M104 146 Q128 132 152 146 L140 156 L128 150 L116 157 Z" fill="#f4f1ea"/>
+  <!-- katana -->
+  <g transform="rotate(-38 128 128)">
+    <path d="M40 131 C90 127 150 124 214 116 L218 120 C160 130 96 134 40 136 Z" fill="#e9edf0" stroke="#1a1614" stroke-width="3"/>
+    <rect x="22" y="126" width="22" height="14" rx="3" fill="#1a1614"/>
+    <ellipse cx="46" cy="133" rx="4" ry="13" fill="#b08a3a" stroke="#1a1614" stroke-width="2"/>
+  </g>
+  <!-- grass strokes -->
+  <path d="M30 236 Q40 200 36 180 M52 238 Q60 205 70 188 M200 238 Q206 206 222 190 M222 236 Q226 214 238 202" stroke="#c9a24a" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>
