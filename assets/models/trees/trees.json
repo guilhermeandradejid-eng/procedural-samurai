@@ -1,0 +1,74 @@
+{
+ "maple_0": {
+  "height": 6.8,
+  "trunk_radius": 0.22000000000000003,
+  "crown_radius": 3.3,
+  "species": "maple"
+ },
+ "maple_1": {
+  "height": 6.8,
+  "trunk_radius": 0.22000000000000003,
+  "crown_radius": 3.3,
+  "species": "maple"
+ },
+ "ginkgo_0": {
+  "height": 10.5,
+  "trunk_radius": 0.264,
+  "crown_radius": 2.6,
+  "species": "ginkgo"
+ },
+ "ginkgo_1": {
+  "height": 10.5,
+  "trunk_radius": 0.264,
+  "crown_radius": 2.6,
+  "species": "ginkgo"
+ },
+ "pine_0": {
+  "height": 9.0,
+  "trunk_radius": 0.275,
+  "crown_radius": 3.2,
+  "species": "pine"
+ },
+ "pine_1": {
+  "height": 9.0,
+  "trunk_radius": 0.275,
+  "crown_radius": 3.2,
+  "species": "pine"
+ },
+ "birch_0": {
+  "height": 11.0,
+  "trunk_radius": 0.165,
+  "crown_radius": 1.9,
+  "species": "birch"
+ },
+ "birch_1": {
+  "height": 11.0,
+  "trunk_radius": 0.165,
+  "crown_radius": 1.9,
+  "species": "birch"
+ },
+ "sakura_0": {
+  "height": 5.8,
+  "trunk_radius": 0.24200000000000002,
+  "crown_radius": 3.9,
+  "species": "sakura"
+ },
+ "sakura_1": {
+  "height": 5.8,
+  "trunk_radius": 0.24200000000000002,
+  "crown_radius": 3.9,
+  "species": "sakura"
+ },
+ "bamboo_0": {
+  "height": 11.0,
+  "trunk_radius": 0.5,
+  "crown_radius": 2.0,
+  "species": "bamboo"
+ },
+ "bamboo_1": {
+  "height": 11.0,
+  "trunk_radius": 0.5,
+  "crown_radius": 2.0,
+  "species": "bamboo"
+ }
+}

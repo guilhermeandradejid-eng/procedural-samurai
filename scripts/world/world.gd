@@ -8,7 +8,15 @@ signal built
 var data: WorldData
 var terrain: Terrain
 var environment_node: WorldEnvironment
+var env: Environment
+var sky_material: ShaderMaterial
 var sun: DirectionalLight3D
+var moon: DirectionalLight3D
+var time_of_day: TimeOfDay
+var wind: Wind
+var weather: Weather
+var water: Water
+var grass: GrassSystem
 var is_built := false
 
 
@@ -19,31 +27,139 @@ func build() -> void:
 	data.apply_shader_globals()
 	_build_environment()
 	_build_terrain()
+	water = Water.new()
+	water.name = "Water"
+	add_child(water)
+	water.build(data)
+	grass = GrassSystem.new()
+	grass.name = "Grass"
+	add_child(grass)
+	grass.build()
 	is_built = true
 	built.emit()
 
 
+func _noise_texture(seed: int, freq: float, octaves: int, cellular := false) -> NoiseTexture2D:
+	var n := FastNoiseLite.new()
+	n.seed = seed
+	n.frequency = freq
+	n.fractal_octaves = octaves
+	if cellular:
+		n.noise_type = FastNoiseLite.TYPE_CELLULAR
+		n.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_DIV
+	else:
+		n.noise_type = FastNoiseLite.TYPE_PERLIN
+	var t := NoiseTexture2D.new()
+	t.width = 512
+	t.height = 512
+	t.seamless = true
+	t.generate_mipmaps = true
+	t.noise = n
+	return t
+
+
 func _build_environment() -> void:
-	environment_node = WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_SKY
+	sky_material = ShaderMaterial.new()
+	sky_material.shader = load("res://shaders/sky.gdshader")
+	sky_material.set_shader_parameter("cloud_noise", _noise_texture(11, 0.012, 5))
+	sky_material.set_shader_parameter("cloud_detail", _noise_texture(12, 0.03, 3, true))
 	var sky := Sky.new()
-	sky.sky_material = ProceduralSkyMaterial.new()
+	sky.sky_material = sky_material
+	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
+
+	env = Environment.new()
+	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_sky_contribution = 1.0
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.tonemap_agx_contrast = 1.18
+	env.tonemap_exposure = 1.0
 	env.glow_enabled = true
+	env.glow_intensity = 0.55
+	env.glow_strength = 1.0
+	env.glow_bloom = 0.06
+	env.glow_hdr_threshold = 1.1
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	env.set("glow_levels/1", 0.0)
+	env.set("glow_levels/2", 0.6)
+	env.set("glow_levels/3", 1.0)
+	env.set("glow_levels/4", 0.8)
+	env.set("glow_levels/5", 0.6)
 	env.fog_enabled = true
+	env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 	env.fog_density = 0.0006
+	env.fog_aerial_perspective = 0.35
+	env.fog_sky_affect = 0.12
+	env.fog_height = 4.0
+	env.fog_height_density = 0.004
+	env.volumetric_fog_enabled = true
+	env.volumetric_fog_density = 0.005
+	env.volumetric_fog_length = 160.0
+	env.volumetric_fog_detail_spread = 2.0
+	env.volumetric_fog_sky_affect = 0.2
+	env.volumetric_fog_ambient_inject = 0.35
+	env.volumetric_fog_temporal_reprojection_enabled = true
+	env.ssao_enabled = true
+	env.ssao_radius = 1.4
+	env.ssao_intensity = 1.6
+	env.ssao_power = 1.4
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.04
+	environment_node = WorldEnvironment.new()
 	environment_node.environment = env
 	add_child(environment_node)
+
 	sun = DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.shadow_enabled = true
-	sun.rotation_degrees = Vector3(-25.0, 150.0, 0.0)
-	sun.light_energy = 1.2
-	sun.directional_shadow_max_distance = 250.0
+	sun.shadow_bias = 0.04
+	sun.shadow_normal_bias = 1.2
+	sun.shadow_blur = 1.2
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_max_distance = 240.0
+	sun.directional_shadow_split_1 = 0.06
+	sun.directional_shadow_split_2 = 0.17
+	sun.directional_shadow_split_3 = 0.42
+	sun.directional_shadow_blend_splits = true
+	sun.light_angular_distance = 0.6
+	sun.light_volumetric_fog_energy = 1.6
 	add_child(sun)
+	moon = DirectionalLight3D.new()
+	moon.name = "Moon"
+	moon.shadow_enabled = true
+	moon.directional_shadow_max_distance = 120.0
+	moon.light_volumetric_fog_energy = 2.5
+	add_child(moon)
+
+	wind = Wind.new()
+	wind.name = "Wind"
+	add_child(wind)
+	weather = Weather.new()
+	weather.name = "Weather"
+	weather.sky_mat = sky_material
+	weather.wind = wind
+	add_child(weather)
+	time_of_day = TimeOfDay.new()
+	time_of_day.name = "TimeOfDay"
+	time_of_day.weather = weather
+	add_child(time_of_day)
+	time_of_day.setup(sun, moon, env, sky_material)
+	apply_quality()
+
+
+func apply_quality() -> void:
+	var q := Settings.quality()
+	env.ssao_enabled = q.ssao
+	env.ssil_enabled = q.ssil
+	env.volumetric_fog_enabled = q.volumetric_fog
+	env.glow_enabled = q.glow
+	sun.directional_shadow_max_distance = q.shadow_distance
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if q.shadow_splits == 4 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	RenderingServer.directional_shadow_atlas_set_size(q.shadow_size, true)
 
 
 func _build_terrain() -> void:
@@ -51,5 +167,7 @@ func _build_terrain() -> void:
 	terrain.name = "Terrain"
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
+	mat.set_shader_parameter("albedo_array", load("res://assets/textures/terrain/terrain_albedo.jpg"))
+	mat.set_shader_parameter("nrh_array", load("res://assets/textures/terrain/terrain_nrh.png"))
 	add_child(terrain)
 	terrain.build(data, mat)

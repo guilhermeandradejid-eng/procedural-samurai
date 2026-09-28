@@ -195,8 +195,40 @@ def _tile_resize(a, w, h):
     return tiled[:h, :w]
 
 
+def pampas_plume(seed=880, w=128, h=256):
+    """Feathery susuki plume (alpha card): drooping silky strands off a stem."""
+    r = rng(seed)
+    ss = 3
+    img = Image.new("RGBA", (w * ss, h * ss), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(img)
+    cx = w * 0.5
+    for i in range(420):
+        t = r.uniform(0.0, 1.0)
+        y0 = h * (0.97 - t * 0.9)
+        side = -1 if r.random() < 0.5 else 1
+        L = w * r.uniform(0.12, 0.42) * (0.4 + 0.6 * math.sin(t * math.pi) ** 0.5)
+        droop = r.uniform(0.2, 0.9)
+        pts = []
+        for k in range(6):
+            u = k / 5
+            pts.append(((cx + side * L * u) * ss, (y0 + droop * L * u * u * 0.9 - (1 - t) * 4 * u) * ss))
+        g = r.uniform(0.82, 1.0)
+        col = (int(250 * g), int(236 * g), int(206 * g), int(r.uniform(150, 255)))
+        dr.line(pts, fill=col, width=max(1, int(ss * r.uniform(0.7, 1.4))), joint="curve")
+    dr.line([(cx * ss, h * ss), (cx * ss, h * 0.05 * ss)], fill=(200, 176, 120, 255), width=int(ss * 2))
+    small = img.resize((w, h), Image.LANCZOS)
+    arr = np.asarray(small).astype(np.float64) / 255.0
+    a = arr[..., 3]
+    mask = a > 0.25
+    idx = ndimage.distance_transform_edt(~mask, return_distances=False, return_indices=True)
+    rgb = arr[..., :3][idx[0], idx[1]]
+    return np.dstack([rgb, a])
+
+
 def generate(out_dir, pool=None):
     os.makedirs(out_dir, exist_ok=True)
+    plume = pampas_plume()
+    Image.fromarray((np.clip(plume, 0, 1) * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(out_dir, "pampas_plume.png"), optimize=True)
     kinds = ["maple", "ginkgo", "pine", "birch", "bamboo", "sakura"]
     for i, k in enumerate(kinds):
         card = foliage_card(k, 500 + i)

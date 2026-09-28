@@ -31,6 +31,31 @@ RULES = [
 
 AUDIO_LOOP_DIRS = ["assets/audio/music", "assets/audio/ambience"]
 
+# images imported as Texture2DArray: path -> (horizontal slices, compress mode)
+TEXTURE_ARRAYS = {
+    "assets/textures/terrain/terrain_albedo.jpg": (8, 2),
+    "assets/textures/terrain/terrain_nrh.png": (8, 0),
+}
+
+
+def write_array_import(src_rel, slices, mode):
+    imp = os.path.join(ROOT, src_rel) + ".import"
+    if os.path.exists(imp):
+        txt = open(imp, encoding="utf-8").read()
+        if 'importer="2d_array_texture"' in txt and "slices/horizontal=%d" % slices in txt:
+            return False
+    uid = ""
+    if os.path.exists(imp):
+        m = re.search(r'^uid="([^"]+)"', open(imp, encoding="utf-8").read(), re.M)
+        if m:
+            uid = 'uid="%s"\n' % m.group(1)
+    txt = ('[remap]\n\nimporter="2d_array_texture"\ntype="CompressedTexture2DArray"\n%s\n'
+           '[params]\n\ncompress/mode=%d\ncompress/high_quality=false\ncompress/lossy_quality=0.7\n'
+           'compress/hdr_compression=1\ncompress/channel_pack=0\nmipmaps/generate=true\nmipmaps/limit=-1\n'
+           'slices/horizontal=%d\nslices/vertical=1\n') % (uid, mode, slices)
+    open(imp, "w", encoding="utf-8").write(txt)
+    return True
+
 
 def patch_params(text, params):
     for k, v in params.items():
@@ -45,8 +70,14 @@ def patch_params(text, params):
 def main():
     changed = 0
     applied = {}
+    for rel, (slices, mode) in TEXTURE_ARRAYS.items():
+        if os.path.exists(os.path.join(ROOT, rel)) and write_array_import(rel, slices, mode):
+            changed += 1
     for pattern, params in RULES:
         for src in glob.glob(os.path.join(ROOT, pattern), recursive=True):
+            rel = os.path.relpath(src, ROOT).replace(os.sep, "/")
+            if rel in TEXTURE_ARRAYS:
+                continue
             imp = src + ".import"
             if not os.path.exists(imp):
                 continue
