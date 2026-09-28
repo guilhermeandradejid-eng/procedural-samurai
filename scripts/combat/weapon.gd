@@ -39,12 +39,14 @@ func setup(p_ch: Node3D, p_body: RagdollBody, p_anim: ProceduralAnimator, p_kind
 	blade_mat = ShaderMaterial.new()
 	blade_mat.shader = load("res://shaders/blade.gdshader")
 	if model:
+		model.owner = null
 		scene.remove_child(model)
 		model.transform = Transform3D.IDENTITY
 		add_child(model)
 		MaterialLibrary.apply(model, {"blade": blade_mat})
 	var sy := scene.get_node_or_null("saya") as Node3D
 	if sy:
+		sy.owner = null
 		scene.remove_child(sy)
 		saya = sy
 		MaterialLibrary.apply(saya)

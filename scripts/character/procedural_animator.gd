@@ -252,7 +252,7 @@ func update(delta: float, st: Dictionary) -> void:
 	var root_pivot := Vector3.ZERO
 	if action == "roll":
 		var rt := clampf(at / 0.62, 0.0, 1.0)
-		var ang := AttackLibrary.ease(clampf((rt - 0.06) / 0.84, 0.0, 1.0), "inout") * TAU
+		var ang := AttackLibrary.ease_curve(clampf((rt - 0.06) / 0.84, 0.0, 1.0), "inout") * TAU
 		var dirv: Vector3 = st.get("roll_dir", fwd)
 		var local_dir := root.basis.inverse() * dirv
 		local_dir.y = 0.0
@@ -267,7 +267,7 @@ func update(delta: float, st: Dictionary) -> void:
 	if action == "sit" or action == "kneel":
 		pelvis_local.origin.y = (0.26 if action == "sit" else 0.48) * s
 	if action == "getup":
-		pelvis_local.origin.y = lerpf(0.3 * s, pelvis_y, AttackLibrary.ease(clampf(at / 0.9, 0.0, 1.0), "inout"))
+		pelvis_local.origin.y = lerpf(0.3 * s, pelvis_y, AttackLibrary.ease_curve(clampf(at / 0.9, 0.0, 1.0), "inout"))
 		pelvis_local.basis = Basis.from_euler(Vector3(deg_to_rad(lerpf(55.0, 0.0, clampf(at / 0.9, 0.0, 1.0))), 0, 0)) * pelvis_local.basis
 	var pelvis_w := root * pelvis_local
 
@@ -402,7 +402,7 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 				var g := _ground(ideal, root.origin.y)
 				f.to = g[0]
 				f.normal = f.normal.slerp(g[1], 0.3)
-				var e := AttackLibrary.ease(t, "inout")
+				var e := AttackLibrary.ease_curve(t, "inout")
 				var lift := lerpf(0.1, 0.22, sprintiness) * s
 				f.pos = f.from.lerp(f.to, e) + Vector3(0, lift * sin(t * PI), 0)
 				f.yaw = lerp_angle(f.yaw, yaw, clampf(delta * 12.0, 0.0, 1.0))
@@ -436,7 +436,7 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 					busy = true
 			else:
 				f.t = minf(1.0, f.t + delta / f.swing_time)
-				var e := AttackLibrary.ease(f.t, "inout")
+				var e := AttackLibrary.ease_curve(f.t, "inout")
 				f.pos = f.from.lerp(f.to, e) + Vector3(0, 0.09 * s * sin(f.t * PI), 0)
 				f.yaw = lerp_angle(f.yaw, yaw, clampf(delta * 10.0, 0.0, 1.0))
 				if f.t >= 1.0:

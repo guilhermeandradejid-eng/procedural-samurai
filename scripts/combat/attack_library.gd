@@ -220,7 +220,7 @@ static func moves_for(weapon: String) -> Array[String]:
 			return ["light_1", "light_2", "light_3", "enemy_heavy"]
 
 
-static func ease(u: float, mode: String) -> float:
+static func ease_curve(u: float, mode: String) -> float:
 	u = clampf(u, 0.0, 1.0)
 	match mode:
 		"in":
@@ -255,7 +255,7 @@ static func sample(keys: Array, t: float) -> Dictionary:
 	var k2: Dictionary = keys[i + 1]
 	var k0: Dictionary = keys[max(i - 1, 0)]
 	var k3: Dictionary = keys[min(i + 2, n - 1)]
-	var u := ease((t - k1.t) / maxf(k2.t - k1.t, 0.0001), k2.ease)
+	var u := ease_curve((t - k1.t) / maxf(k2.t - k1.t, 0.0001), k2.ease)
 	var pos: Vector3 = _cr(k0.pos, k1.pos, k2.pos, k3.pos, u)
 	var dir: Vector3 = (_cr(k0.dir, k1.dir, k2.dir, k3.dir, u) as Vector3).normalized()
 	if dir.length_squared() < 0.5:

@@ -161,6 +161,7 @@ Settings="*res://scripts/autoload/settings.gd"
 Game="*res://scripts/autoload/game.gd"
 Audio="*res://scripts/autoload/audio.gd"
 SaveGame="*res://scripts/autoload/save_game.gd"
+FX="*res://scripts/autoload/fx.gd"
 
 [debug]
 

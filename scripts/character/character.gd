@@ -1,0 +1,591 @@
+class_name Character
+extends CharacterBody3D
+## Base class for the player and every enemy. The CharacterBody3D capsule
+## handles robust locomotion on the open-world terrain; the RagdollBody is
+## the visible, physical HFF-style body that follows the procedural
+## animation. Actions (attacks, rolls, blocks, reactions...) are small timed
+## states; combat results are resolved in receive_hit().
+
+signal died(ch: Character, info: Dictionary)
+signal damaged(ch: Character, amount: float, info: Dictionary)
+signal attack_started(ch: Character, attack: Dictionary)
+signal hit_landed(ch: Character, target: Character, result: String, info: Dictionary)
+
+enum Team { PLAYER, ENEMY }
+
+const PARRY_WINDOW := 0.2
+const ROLL_TIME := 0.62
+const ROLL_DISTANCE := 4.6
+
+var style := "ronin"
+var team := Team.ENEMY
+var scale_factor := 1.0
+var seed := 0
+var body: RagdollBody
+var animator: ProceduralAnimator
+var weapon: Weapon
+var weapon_kind := "katana"
+
+var max_health := 100.0
+var health := 100.0
+var max_guard := 100.0
+var guard := 100.0
+var guard_regen := 16.0
+var dead := false
+var disarmed := false
+var invulnerable := 0.0
+var bleeding := 0.0
+var terrified := 0.0
+
+var move_dir := Vector3.ZERO
+var move_speed := 0.0
+var face_dir := Vector3.FORWARD
+var turn_rate := 12.0
+var gravity_accel := 17.0
+var accel_ground := 32.0
+var accel_air := 5.0
+var external_velocity := Vector3.ZERO
+var landed := 0.0
+var _was_on_floor := true
+var _fall_speed := 0.0
+
+var action := ""
+var action_time := 0.0
+var action_duration := 0.0
+var attack := {}
+var queued_attack := ""
+var roll_dir := Vector3.FORWARD
+var hit_dir := Vector3.ZERO
+var weapon_drawn := false
+var combat := false
+var crouching := false
+var sprinting := false
+var blocking := false
+var block_time := 0.0
+var look_target: Variant = null
+var knock_timer := 0.0
+var kill_info := {}
+var _sweep_sound_done := false
+var _exclude: Array[RID] = []
+
+
+func _ready() -> void:
+	collision_layer = 1 << 1
+	collision_mask = 1 | (1 << 1)
+	floor_max_angle = deg_to_rad(52.0)
+	floor_snap_length = 0.45
+	safe_margin = 0.02
+	var cs := CollisionShape3D.new()
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.3 * scale_factor
+	cap.height = 1.75 * scale_factor
+	cs.shape = cap
+	cs.position = Vector3(0, 0.875 * scale_factor, 0)
+	add_child(cs)
+	var st: Dictionary = CharacterStyle.STYLES.get(style, CharacterStyle.STYLES["ronin"])
+	max_health = float(st.hp)
+	health = max_health
+	weapon_kind = st.weapon
+	body = RagdollBody.new()
+	body.name = "Body"
+	add_child(body)
+	body.top_level = true
+	body.global_transform = Transform3D.IDENTITY
+	body.build(self, style, scale_factor, seed)
+	animator = ProceduralAnimator.new()
+	animator.setup(self, body, scale_factor)
+	for rb in body.all_bodies():
+		_exclude.append((rb as RigidBody3D).get_rid())
+	_exclude.append(get_rid())
+	weapon = Weapon.new()
+	weapon.name = "Weapon"
+	weapon.setup(self, body, animator, weapon_kind)
+	weapon.struck.connect(_on_weapon_struck)
+	if weapon_drawn:
+		weapon.hold()
+	else:
+		weapon.sheathe()
+	body.part_severed.connect(_on_part_severed)
+	face_dir = -global_basis.z
+	# settle the body on the initial pose
+	animator.update(1.0 / 60.0, anim_state())
+	body.snap_to_targets()
+
+
+func anim_state() -> Dictionary:
+	return {
+		"root": Transform3D(global_basis.orthonormalized(), global_position),
+		"velocity": velocity,
+		"on_floor": is_on_floor() or action == "knockdown",
+		"weapon": weapon_kind,
+		"weapon_in_hand": weapon != null and weapon.in_hand and not disarmed,
+		"action": action,
+		"action_time": action_time,
+		"attack": attack,
+		"combat": combat,
+		"crouching": crouching,
+		"run_blade_back": weapon_drawn and sprinting and action == "",
+		"look_target": look_target,
+		"hit_dir": hit_dir,
+		"roll_dir": roll_dir,
+		"landed": landed,
+		"exclude": _exclude,
+	}
+
+
+# ------------------------------------------------------------------ loop
+
+func _physics_process(delta: float) -> void:
+	if dead:
+		body.drive(delta)
+		return
+	_think(delta)
+	_update_action(delta)
+	_update_stats(delta)
+	_move(delta)
+	animator.update(delta, anim_state())
+	landed = 0.0
+	body.drive(delta)
+	if weapon:
+		weapon.physics_update(delta)
+
+
+## Overridden by Player (input) and Enemy (AI).
+func _think(_delta: float) -> void:
+	pass
+
+
+func _update_stats(delta: float) -> void:
+	invulnerable = maxf(0.0, invulnerable - delta)
+	terrified = maxf(0.0, terrified - delta)
+	if action != "block" and action != "attack":
+		guard = minf(max_guard, guard + guard_regen * delta)
+	if blocking:
+		block_time += delta
+	if bleeding > 0.0:
+		var d := bleeding * delta
+		health -= d
+		if Game.rng.randf() < delta * 3.0:
+			FX.drip(body.parts["chest"].global_position + Vector3(0, -0.2, 0))
+		if health <= 0.0:
+			die({"cause": "bleed"})
+
+
+func _move(delta: float) -> void:
+	if action == "knockdown":
+		# the capsule follows the ragdoll while it tumbles
+		var p: Vector3 = body.parts["pelvis"].global_position
+		var target := Vector3(p.x, global_position.y, p.z)
+		velocity = (target - global_position) / maxf(delta, 1e-3)
+		velocity.y -= gravity_accel * delta
+		move_and_slide()
+		return
+	var desired := move_dir * move_speed
+	var locked := action in ["hit", "stagger", "getup", "heal", "parry", "chiburi", "pray", "sit", "kneel", "standoff", "iai_ready"]
+	if action == "attack":
+		desired *= 0.15
+		var sw: Array = attack.get("step_window", [0.0, 0.0])
+		if action_time >= sw[0] and action_time <= sw[1] and sw[1] > sw[0]:
+			var step_speed: float = float(attack.get("step", 0.0)) / (sw[1] - sw[0])
+			desired += -global_basis.z * step_speed
+	elif action == "roll":
+		var k := clampf(action_time / ROLL_TIME, 0.0, 1.0)
+		desired = roll_dir * (ROLL_DISTANCE / ROLL_TIME) * (1.4 - k * 0.9)
+	elif action == "block":
+		desired *= 0.45
+	elif locked:
+		desired = Vector3.ZERO
+	var hv := Vector3(velocity.x, 0.0, velocity.z)
+	var acc := accel_ground if is_on_floor() else accel_air
+	if action == "roll" or (action == "attack"):
+		acc = 60.0
+	hv = hv.move_toward(desired, acc * delta)
+	external_velocity = external_velocity.lerp(Vector3.ZERO, clampf(delta * 5.0, 0.0, 1.0))
+	velocity.x = hv.x + external_velocity.x
+	velocity.z = hv.z + external_velocity.z
+	if is_on_floor():
+		if velocity.y < 0.0:
+			velocity.y = -1.0
+	else:
+		velocity.y -= gravity_accel * delta
+		_fall_speed = maxf(_fall_speed, -velocity.y)
+	move_and_slide()
+	var on_floor := is_on_floor()
+	if on_floor and not _was_on_floor:
+		_on_landed(_fall_speed)
+		_fall_speed = 0.0
+	_was_on_floor = on_floor
+	# turning
+	if face_dir.length_squared() > 0.01 and action != "roll" and action != "knockdown":
+		var target_yaw := atan2(-face_dir.x, -face_dir.z)
+		var rate := turn_rate
+		if action == "attack":
+			rate = 4.0 if action_time < float(attack.get("active", [0.2])[0]) else 0.6
+		rotation.y = lerp_angle(rotation.y, target_yaw, clampf(rate * delta, 0.0, 1.0))
+	# keep the body from being left behind if the capsule got teleported
+	if global_position.distance_squared_to(body.parts["pelvis"].global_position) > 36.0 and not dead:
+		animator.initialized = false
+		animator.update(delta, anim_state())
+		body.snap_to_targets()
+
+
+func _on_landed(fall_speed: float) -> void:
+	landed = clampf((fall_speed - 3.0) / 10.0, 0.0, 1.0)
+	if fall_speed > 6.0:
+		Audio.play_at("land", global_position, -4.0)
+		FX.dust(global_position, 1.0 + landed)
+	if fall_speed > 17.0:
+		var dmg := (fall_speed - 17.0) * 6.0
+		receive_hit({"damage": dmg, "fall": true, "dir": Vector3.DOWN, "part": "pelvis", "point": global_position})
+		knockdown(Vector3.DOWN * 3.0)
+
+
+# ------------------------------------------------------------------ actions
+
+func set_action(name: String, duration: float) -> void:
+	if weapon and weapon.sweeping:
+		weapon.end_sweep()
+	action = name
+	action_time = 0.0
+	action_duration = duration
+
+
+func end_action() -> void:
+	if weapon and weapon.sweeping:
+		weapon.end_sweep()
+	var was := action
+	action = ""
+	action_time = 0.0
+	attack = {}
+	if was == "attack" and queued_attack != "":
+		var q := queued_attack
+		queued_attack = ""
+		start_attack(q)
+
+
+func can_act() -> bool:
+	return not dead and action in ["", "block"]
+
+
+func start_attack(name: String) -> bool:
+	var a := AttackLibrary.get_attack(name)
+	if a.is_empty() or dead or disarmed:
+		return false
+	if not weapon_drawn:
+		draw_weapon(true)
+	blocking = false
+	attack = a
+	set_action("attack", float(a.duration))
+	_sweep_sound_done = false
+	attack_started.emit(self, a)
+	return true
+
+
+func draw_weapon(instant := false) -> void:
+	if weapon_drawn or disarmed:
+		return
+	weapon_drawn = true
+	combat = true
+	weapon.hold()
+	Audio.play_at("sword_draw", global_position, -6.0)
+	if not instant and action == "":
+		set_action("draw", 0.46)
+
+
+func sheathe_weapon(with_chiburi := true) -> void:
+	if not weapon_drawn:
+		return
+	if with_chiburi and action == "" and weapon_kind == "katana":
+		set_action("chiburi", 1.1)
+	else:
+		weapon_drawn = false
+		combat = false
+		weapon.sheathe()
+
+
+func roll(dir: Vector3) -> bool:
+	if dead or action in ["roll", "knockdown", "getup"]:
+		return false
+	var d := Vector3(dir.x, 0.0, dir.z)
+	if d.length_squared() < 0.01:
+		d = global_basis.z  # backwards
+	roll_dir = d.normalized()
+	blocking = false
+	set_action("roll", ROLL_TIME)
+	invulnerable = 0.42
+	Audio.play_at("roll", global_position, -6.0)
+	FX.dust(global_position, 0.8)
+	return true
+
+
+func knockdown(impulse: Vector3) -> void:
+	if dead:
+		return
+	set_action("knockdown", 99.0)
+	knock_timer = 1.25
+	blocking = false
+	body.strength = 0.0
+	for p in body.parts:
+		body.impulse(p, impulse * 0.25)
+	body.impulse("chest", impulse)
+
+
+func stagger(dir: Vector3, strength := 1.0) -> void:
+	if dead:
+		return
+	hit_dir = dir.normalized()
+	set_action("stagger", 0.9)
+	blocking = false
+	external_velocity += hit_dir * 3.5 * strength
+	body.strength = 0.35
+	body.weaken("chest", 0.2)
+
+
+func _update_action(delta: float) -> void:
+	if action == "":
+		body.strength = move_toward(body.strength, 1.0, delta * 1.5)
+		return
+	action_time += delta
+	match action:
+		"attack":
+			var act: Array = attack.get("active", [0.0, 0.0])
+			if not _sweep_sound_done and action_time >= float(attack.get("swing_time", act[0])):
+				_sweep_sound_done = true
+				Audio.play_at("swing_heavy" if float(attack.get("power", 1.0)) > 1.4 else "swing", weapon.tip(), -2.0, 0.1)
+			if action_time >= act[0] and action_time <= act[1] and not weapon.sweeping:
+				weapon.begin_sweep()
+			elif action_time > act[1] and weapon.sweeping:
+				weapon.end_sweep()
+			if queued_attack != "" and action_time >= float(attack.get("cancel", 99.0)):
+				var q := queued_attack
+				queued_attack = ""
+				start_attack(q)
+				return
+			if action_time >= action_duration:
+				end_action()
+		"knockdown":
+			knock_timer -= delta
+			var still: bool = (body.parts["pelvis"] as RigidBody3D).linear_velocity.length() < 1.0
+			if knock_timer <= 0.0 and still:
+				set_action("getup", 0.9)
+				animator.initialized = false
+		"getup":
+			body.strength = clampf(action_time / 0.7, 0.05, 1.0)
+			if action_time >= action_duration:
+				end_action()
+		"stagger", "hit":
+			body.strength = move_toward(body.strength, 1.0, delta * 1.2)
+			if action_time >= action_duration:
+				end_action()
+		"chiburi":
+			if action_time >= 0.36 and action_time - delta < 0.36:
+				FX.blood_flick(weapon.tip(), -global_basis.z.rotated(Vector3.UP, -0.8), weapon.blood)
+				weapon.set_blood(0.0)
+				Audio.play_at("swing", weapon.tip(), -8.0, 0.2)
+			if action_time >= 0.95 and weapon_drawn:
+				weapon_drawn = false
+				combat = false
+				weapon.sheathe()
+				Audio.play_at("sword_sheathe", global_position, -4.0)
+			if action_time >= action_duration:
+				end_action()
+		"block":
+			pass
+		_:
+			if action_time >= action_duration and action_duration < 90.0:
+				end_action()
+
+
+# ------------------------------------------------------------------ combat
+
+func _on_weapon_struck(target: Node, part: String, point: Vector3, dir: Vector3) -> void:
+	if not (target is Character):
+		return
+	var t := target as Character
+	if t.dead or t.team == team:
+		return
+	var info := {
+		"attacker": self, "part": part, "point": point, "dir": dir,
+		"damage": float(attack.get("damage", 15.0)), "guard_damage": float(attack.get("guard_damage", 10.0)),
+		"attack": attack.get("name", ""), "power": float(attack.get("power", 1.0)),
+		"unblockable": attack.get("unblockable", false), "breaks_guard": attack.get("breaks_guard", false),
+		"cut": attack.get("cut", "horizontal"), "hitstop": float(attack.get("hitstop", 0.06)),
+	}
+	info.damage *= damage_multiplier()
+	var result := t.receive_hit(info)
+	hit_landed.emit(self, t, result, info)
+	match result:
+		"hit", "killed":
+			weapon.add_blood(0.18 if result == "hit" else 0.35)
+		"parried":
+			weapon.end_sweep()
+			stagger(-(-global_basis.z), 1.2)
+			weapon.glint(Color(1.0, 0.85, 0.5), 0.4)
+		"blocked":
+			external_velocity += global_basis.z * 1.5
+
+
+func damage_multiplier() -> float:
+	return 1.0
+
+
+func is_facing(point: Vector3, cos_limit := 0.3) -> bool:
+	var to := point - global_position
+	to.y = 0.0
+	if to.length_squared() < 1e-4:
+		return true
+	return (-global_basis.z).dot(to.normalized()) > cos_limit
+
+
+## Resolves an incoming hit. Returns "dodged", "parried", "blocked",
+## "guard_broken", "hit" or "killed".
+func receive_hit(info: Dictionary) -> String:
+	if dead:
+		return "dead"
+	var attacker: Character = info.get("attacker", null)
+	var point: Vector3 = info.get("point", global_position + Vector3(0, 1.2, 0))
+	var dir: Vector3 = info.get("dir", Vector3.FORWARD)
+	if invulnerable > 0.0 and not info.get("fall", false):
+		_on_dodged(info)
+		return "dodged"
+	var from_front := attacker != null and is_facing(attacker.global_position, 0.1)
+	if action == "block" and attacker and from_front and not info.get("unblockable", false):
+		if block_time <= PARRY_WINDOW:
+			_on_parried(info)
+			return "parried"
+		guard -= float(info.get("guard_damage", 10.0))
+		FX.sparks(point, -dir, 1.0)
+		Audio.play_at("clash", point, 0.0, 0.1)
+		Game.shake(0.25)
+		Game.hitstop(0.05)
+		if guard <= 0.0 or info.get("breaks_guard", false):
+			guard = max_guard * 0.35
+			stagger(dir, 1.3)
+			Audio.play_at("guard_break", point, 2.0)
+			return "guard_broken"
+		external_velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 1.8
+		body.weaken("chest", 0.5)
+		return "blocked"
+	# the hit lands
+	var dmg: float = info.get("damage", 10.0)
+	health -= dmg
+	hit_dir = Vector3(dir.x, 0.0, dir.z).normalized()
+	var part: String = info.get("part", "chest")
+	var power: float = info.get("power", 1.0)
+	damaged.emit(self, dmg, info)
+	if not info.get("fall", false):
+		FX.blood_hit(point, dir, power)
+		body.add_blood(part, point, 0.07 + 0.03 * power, 0.12 * power)
+		body.flash(part, 1.0)
+		body.impulse(part, dir * 18.0 * power * scale_factor, point)
+		body.weaken(part, 0.1)
+		Audio.play_at("flesh_cut", point, 0.0, 0.1)
+		Game.hitstop(float(info.get("hitstop", 0.06)))
+	if health <= 0.0:
+		die(info)
+		return "killed"
+	if power >= 1.7 or info.get("breaks_guard", false):
+		stagger(dir, power * 0.8)
+	elif action != "attack" or power >= 1.2:
+		set_action("hit", 0.35)
+		body.strength = 0.4
+	external_velocity += hit_dir * 1.6 * power
+	return "hit"
+
+
+func _on_dodged(_info: Dictionary) -> void:
+	pass
+
+
+func _on_parried(info: Dictionary) -> void:
+	var point: Vector3 = info.get("point", global_position)
+	FX.sparks(point, -(info.get("dir", Vector3.FORWARD) as Vector3), 2.2)
+	Audio.play_at("parry", point, 3.0)
+	Game.hitstop(0.09)
+	Game.shake(0.35)
+	set_action("parry", 0.34)
+	blocking = false
+
+
+func die(info: Dictionary) -> void:
+	if dead:
+		return
+	dead = true
+	kill_info = info
+	health = 0.0
+	if weapon and weapon.sweeping:
+		weapon.end_sweep()
+	collision_layer = 0
+	collision_mask = 1
+	var gore: bool = Settings.get_value("gore", true)
+	var severed := ""
+	if gore and not info.get("fall", false) and info.has("attacker"):
+		severed = _choose_dismemberment(info)
+	var dir: Vector3 = info.get("dir", Vector3.FORWARD)
+	body.die()
+	if severed != "":
+		var imp: Vector3 = (dir * 3.5 + Vector3.UP * (4.0 if severed == "head" else 1.5)) * float(body.parts[severed].mass)
+		body.sever(severed, imp)
+	for p in body.parts:
+		body.impulse(p, dir * 2.0 * body.parts[p].mass * 0.3)
+	body.impulse("chest", dir * 25.0 * float(info.get("power", 1.0)))
+	if weapon and not weapon.dropped and weapon.in_hand:
+		weapon.drop(dir * 2.0 + Vector3.UP * 2.0)
+	Audio.play_at("death_grunt", global_position + Vector3(0, 1.5, 0), -2.0, 0.12)
+	Audio.play_at("body_fall", global_position, -4.0)
+	FX.blood_pool_later(self)
+	died.emit(self, info)
+
+
+func _choose_dismemberment(info: Dictionary) -> String:
+	var part: String = info.get("part", "chest")
+	var cut: String = info.get("cut", "horizontal")
+	var power: float = info.get("power", 1.0)
+	var chance := 0.5 + 0.35 * clampf(power - 1.0, 0.0, 1.0)
+	if power >= 1.8:
+		chance = 1.0
+	if Game.rng.randf() > chance or cut == "crush":
+		return ""
+	if cut == "thrust":
+		return ""
+	match part:
+		"head":
+			return "head"
+		"chest":
+			if cut == "horizontal" and (info.get("point", Vector3.ZERO) as Vector3).y > global_position.y + 1.4 * scale_factor:
+				return "head"
+			return "chest" if power >= 1.3 else "head"
+		"belly", "pelvis":
+			return "chest" if power >= 1.3 else ""
+		"upper_arm_r", "forearm_r", "hand_r", "upper_arm_l", "forearm_l", "hand_l":
+			return part.replace("hand", "forearm")
+		"thigh_r", "shin_r", "foot_r", "thigh_l", "shin_l", "foot_l":
+			return part.replace("foot", "shin")
+	return "head"
+
+
+func _on_part_severed(part: String, stump: String) -> void:
+	var rb: RigidBody3D = body.parts[part]
+	var dir: Vector3 = (Rig.end[part] - Rig.pivot[part]).normalized()
+	FX.stump_fountain(body.parts[stump], body.parts[stump].global_transform.affine_inverse() * rb.global_position, body.parts[stump].global_basis.inverse() * (global_basis * dir), 2.8)
+	FX.stump_fountain(rb, Vector3.ZERO, -(Rig.end[part] - Rig.pivot[part]).normalized(), 1.6)
+	FX.blood_burst(rb.global_position, global_basis * dir, 1.6)
+	Audio.play_at("dismember", rb.global_position, 3.0)
+	Game.shake(0.45)
+	SaveGame.data.dismemberments = int(SaveGame.data.get("dismemberments", 0)) + 1
+	if part.begins_with("forearm_r") or part.begins_with("upper_arm_r") or part == "hand_r":
+		if weapon and not weapon.dropped:
+			weapon.drop(Vector3.UP * 2.0)
+		disarmed = true
+
+
+func heal(amount: float) -> void:
+	health = minf(max_health, health + amount)
+
+
+func is_alive() -> bool:
+	return not dead
+
+
+func chest_position() -> Vector3:
+	return (body.parts["chest"] as RigidBody3D).global_position if body else global_position + Vector3(0, 1.3, 0)

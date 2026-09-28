@@ -311,7 +311,7 @@ func add_blood(part: String, world_pos: Vector3, radius := 0.07, spread := 0.15)
 	if not parts.has(part):
 		return
 	var rb: RigidBody3D = parts[part]
-	var local := rb.global_transform.affine_inverse() * world_pos + com[part]
+	var local: Vector3 = rb.global_transform.affine_inverse() * world_pos + com[part]
 	for mi in part_meshes[part]:
 		var mesh_local: Vector3 = mi.transform.affine_inverse() * (local - com[part])
 		mi.set_instance_shader_parameter("blood_hit", Vector4(mesh_local.x, mesh_local.y, mesh_local.z, radius / scale_factor))
@@ -407,7 +407,7 @@ func _add_cap(on_part: String, pivot_char_space: Vector3, normal_rest: Vector3, 
 		_bone_mesh.height = 2.0
 	var rb: RigidBody3D = parts[on_part]
 	# rest-space position relative to the part's body origin (pivot + com)
-	var local := pivot_char_space - Rig.pivot[on_part] * scale_factor - com[on_part]
+	var local: Vector3 = pivot_char_space - Rig.pivot[on_part] * scale_factor - com[on_part]
 	var mi := MeshInstance3D.new()
 	mi.mesh = _cap_mesh
 	var b := _basis_y_to(normal_rest)
