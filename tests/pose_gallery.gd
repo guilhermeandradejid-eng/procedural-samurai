@@ -189,6 +189,11 @@ func _run() -> void:
 			while t0 < float(tt):
 				await get_tree().physics_frame
 				t0 += 1.0 / Engine.physics_ticks_per_second
+			if OS.get_environment("GALLERY_LOG") != "":
+				var gc: Transform3D = ch.animator.grip_char
+				var hand: Vector3 = ch.animator_hand_debug() if ch.has_method("animator_hand_debug") else Vector3.ZERO
+				print("%s t=%.3f action=%s at=%.3f grip=%s bladedir=%s weapon_in_hand=%s wpos=%s" % [name, t0, ch.action, ch.action_time,
+					gc.origin.snapped(Vector3.ONE * 0.01), gc.basis.y.snapped(Vector3.ONE * 0.01), ch.weapon.in_hand, ch.weapon.global_position.snapped(Vector3.ONE * 0.01)])
 			# freeze the simulation while the frames are captured (rendering is slow
 			# and physics would otherwise run on between the shots)
 			get_tree().paused = true
@@ -203,6 +208,8 @@ func _run() -> void:
 				var dist := 3.3
 				cam.global_position = focus + Vector3(sin(ang), 0.16, -cos(ang)) * dist
 				cam.look_at(focus + Vector3(0, 0.2, 0))
+				if OS.get_environment("GALLERY_LOG") != "":
+					continue
 				await RenderingServer.frame_post_draw
 				var img := get_viewport().get_texture().get_image()
 				img.save_png("%s/%s_%d_%d.png" % [out_dir, name, view, v])
