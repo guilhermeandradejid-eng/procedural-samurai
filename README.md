@@ -3,12 +3,15 @@
 Um jogo de mundo aberto em **Godot 4.7** onde você é um samurai "bonequinho gordinho" no estilo
 *Human Fall Flat* (cabeção, corpo de ragdoll ativo, armadura, chapéu e katana), explorando uma ilha
 inspirada em *Ghost of Tsushima* / *Ghost of Yōtei*: planícies douradas, bordos vermelhos, bambuzais,
-lago, litoral e o vulcão Ezo-Fuji. Tudo — mundo, texturas, modelos 3D e **todos os sons** — é gerado por
-código (Python + Blender como módulo `bpy`), sem nenhum asset externo.
+lago, litoral e o vulcão Ezo-Fuji. Mundo, texturas, modelos 3D e **todos os sons** são gerados por código
+(Python + Blender como módulo `bpy`); as únicas coisas de fora são as **animações prontas e gratuitas**
+(KayKit, CC0, e captura de movimento do DeepMimic — veja `assets/motion/CREDITS.md`).
 
 > Combate cheio de *game juice*: golpes com câmera lenta, aparos perfeitos, fatiamento de verdade
 > (o corte segue o plano da lâmina e mostra o interior), desmembramento, sangue por todo lado, cabeças que
-> quicam com um sonoro **BOING!** e muito exagero — sem textos na tela atrapalhando a cena.
+> quicam com um sonoro **BOING!**, e um pouco de *Devil May Cry*: cada golpe corta o vento (crescente de
+> ar que distorce a imagem), deixa imagens residuais nos avanços, e os golpes fortes borram a tela e
+> "racham" a imagem — sem textos na tela atrapalhando a cena.
 
 ## Como jogar
 
@@ -48,12 +51,15 @@ godot --path . -- --play   # pula a tela de título
   rente ao solo, chuva com respingos, poças com ondulações, relâmpagos que iluminam nuvens e neblina;
   grama que pende molhada, personagens ensopados e gotas na lente da câmera.
 * **Personagens**: ragdoll ativo (corpo físico que persegue poses-alvo) tocando **clipes de animação
-  esquelética** (captura de movimento real para andar/correr/rolar, poses-chave autorais para golpes e
-  reações) com stride warping, orientation warping, inertialization, pés presos ao terreno por IK e
-  empunhadura de duas mãos; armaduras/kabuto/kasa/katana modelados em Blender. Veja `docs/animacao.md`
-  (inclui o pipeline para gerar golpes por texto com AnimationGPT).
+  esquelética prontos** (KayKit CC0 para golpes, guarda, reações e levantar; captura de movimento real
+  para andar/correr/rolar) retargetados para o boneco chibi, com stride warping, orientation warping,
+  inertialization, pés presos ao terreno por IK e empunhadura de duas mãos; armaduras/kabuto/kasa/katana
+  modelados em Blender. Veja `docs/animacao.md`.
 * **Combate**: combos, carga, bloqueio/aparo, rolamento com i-frames, ímã de golpe, atordoamento,
-  vento/desmembramento e **fatiamento por plano** com shader de corte.
+  desmembramento e **fatiamento por plano** com shader de corte. Efeitos à la *Devil May Cry*: crescente
+  de vento com refração, fita de ar atrás da lâmina, imagens residuais, desfoque radial, linhas de
+  velocidade e o "corte" que racha a tela nos golpes fortes (opções: *Efeitos de combate* e
+  *Desfoque de movimento*).
 * **IA**: percepção por visão/ruído, alerta em grupo, fichas de ataque (poucos atacam por vez), fintas,
   golpes telegrafados (brilho vermelho = imbloqueável), fuga, patrulhas.
 * **Áudio 100 % sintetizado**: espadas, carne, vozes, sinos, taiko + shakuhachi + koto, ambientes.
@@ -86,7 +92,7 @@ xvfb-run godot --path . --rendering-driver vulkan res://tests/pose_gallery.tscn 
 python3 tests/make_sheet.py <dir> <prefixo>                          # folha de poses
 godot --path . -- --tour <dir> --weather storm --time 17.5          # capturas do mundo (views: sun, moon, ...)
 python3 tools/motion/check_clips.py                                  # sanidade dos clipes de animação
-python3 tools/motion/text2motion/selftest.py                         # importador de texto→movimento
+godot --headless --path . res://tests/track_test.tscn               # erro (cm) entre o clipe e o ragdoll, por ação
 ```
 
 Variáveis do `--autotest`: `AUTOTEST_MODE=standoff|assassinate`, `AUTOTEST_FRAMES`, `AUTOTEST_APPROACH`.

@@ -1,8 +1,9 @@
 """Bakes every clip the game plays into assets/motion (run: python3 build_all.py).
 
-Sources:
+Sources (later steps override earlier ones with the same clip name):
   * DeepMimic motion capture (real mocap from pybullet_data)  -> walk, run, sprint, roll, crouch_walk
-  * authored key poses (authoring.py)                          -> idle, guard, reactions, attacks...
+  * authored key poses (authoring.py)                          -> reactions, block, parry, poses...
+  * KayKit Adventurers pack, CC0 (kaykit.py, needs KAYKIT_DIR) -> attacks, idle/guard, hits, get-up, sit
 """
 import os
 import sys
@@ -88,7 +89,7 @@ def build_roll():
 
 
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["locomotion", "roll", "poses", "katana", "polearms"]
+    which = sys.argv[1:] or ["locomotion", "roll", "poses", "katana", "polearms", "kaykit"]
     if "locomotion" in which:
         build_locomotion()
     if "roll" in which:
@@ -102,3 +103,6 @@ if __name__ == "__main__":
     if "polearms" in which:
         import clips_polearms
         clips_polearms.build(OUT)
+    if "kaykit" in which:
+        import kaykit
+        kaykit.build(out_dir=OUT)

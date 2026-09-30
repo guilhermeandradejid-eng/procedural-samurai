@@ -21,6 +21,11 @@ func _ready() -> void:
 	_mat.set_shader_parameter("trail_tex", load("res://assets/textures/fx/slash_trail.png"))
 	material_override = _mat
 	extra_cull_margin = 16384.0
+	# the swing also tears the air: a second pass shimmers the picture behind the ribbon
+	if float(Settings.get_value("combat_fx", 1.0)) > 0.05:
+		var air := ShaderMaterial.new()
+		air.shader = load("res://shaders/air_ribbon.gdshader")
+		material_overlay = air
 
 
 func set_color(c: Color) -> void:
