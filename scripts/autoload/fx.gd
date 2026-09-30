@@ -531,6 +531,9 @@ func _setup_swing_fx() -> void:
 	_streak_mat.albedo_color = Color(0.85, 0.95, 1.0)
 	_streak_mat.emission = Color(0.7, 0.85, 1.0)
 	_streak_mat.emission_energy_multiplier = 5.0
+	# camera-facing strips that keep their length along the velocity
+	_streak_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	_streak_mat.billboard_keep_scale = true
 	_mat_streaks = ParticleProcessMaterial.new()
 	_mat_streaks.direction = Vector3(0, 0, -1)
 	_mat_streaks.spread = 16.0

@@ -9,7 +9,7 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap, repeat
 uniform vec4 tint : source_color = vec4(0.85, 0.95, 1.0, 1.0);
 uniform float age = 0.0;
 uniform float roll = 0.0;
-uniform float bite = 0.34;        // thickness of the crescent at its middle
+uniform float bite = 0.46;        // thickness of the crescent at its middle
 uniform float bend = 0.05;        // how far the haze pushes the image (screen uv)
 uniform float energy = 3.0;
 
@@ -28,12 +28,12 @@ void fragment() {
 	float outer = length(p);
 	float inner = length(p - vec2(0.0, -bite * (1.0 - 0.55 * age)));
 	float m = smoothstep(1.0, 0.93, outer) * smoothstep(1.0, 1.07, inner);
-	float rim = smoothstep(0.80, 0.965, outer) * (1.0 - smoothstep(0.965, 1.0, outer));
+	float rim = smoothstep(0.70, 0.96, outer) * (1.0 - smoothstep(0.96, 1.0, outer));
 	float fade = (1.0 - age) * (1.0 - age) * smoothstep(0.0, 0.06, age + 0.06);
 	vec2 dir = normalize(p + vec2(1e-4));
 	vec2 uv = SCREEN_UV + dir * bend * m * (1.0 - age);
 	vec3 bg = texture(screen_tex, uv).rgb;
-	vec3 col = mix(bg, tint.rgb * energy, clamp(rim * 0.95 + m * 0.12, 0.0, 1.0));
+	vec3 col = mix(bg, tint.rgb * energy, clamp(rim * 0.95 + m * 0.2, 0.0, 1.0));
 	ALBEDO = col;
 	ALPHA = clamp(m * fade * 1.15, 0.0, 1.0);
 }

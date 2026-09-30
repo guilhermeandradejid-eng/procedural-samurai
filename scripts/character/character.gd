@@ -308,8 +308,12 @@ func _swing_juice() -> void:
 	if team != Team.PLAYER:
 		size *= 0.8
 	FX.wind_slash(mid + fwd * 0.55, fwd, sweep.normalized(), size, _trail_color(), 0.24 + 0.05 * power, not thrust)
-	if team == Team.PLAYER and power >= 1.6:
-		FX.afterimage(self, Color(1.0, 0.72, 0.38), 0.36, 0.5)
+	if team == Team.PLAYER:
+		if power >= 1.6:
+			FX.afterimage(self, Color(1.0, 0.72, 0.38), 0.36, 0.5)
+		if power >= 1.3:
+			# the picture rushes towards the swing for a beat
+			Game.radial_blur.emit(0.011 * power * float(Settings.get_value("combat_fx", 1.0)), mid, 0.11)
 
 
 ## Afterimages while the player dashes: a lunge, a roll, a sprint.
