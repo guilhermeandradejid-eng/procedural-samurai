@@ -54,6 +54,7 @@ var look_w := 0.0
 var smoothed_speed := 0.0
 var pelvis_drop := 0.0
 var prev_yaw := 0.0
+var yaw_rate := 0.0
 
 # weapon relative to the hand pivot (hand local frame): handle through the fist,
 # blade forward, edge down when the arm hangs in rest pose
@@ -183,6 +184,7 @@ func update(delta: float, st: Dictionary) -> void:
 	var yaw := root.basis.get_euler().y
 	var dyaw := wrapf(yaw - prev_yaw, -PI, PI)
 	prev_yaw = yaw
+	yaw_rate = lerpf(yaw_rate, dyaw / maxf(delta, 1e-4), clampf(delta * 6.0, 0.0, 1.0))
 	var action: String = st.get("action", "")
 	if not initialized:
 		_reset(root)
@@ -222,6 +224,12 @@ func update(delta: float, st: Dictionary) -> void:
 		_final.rot[1] = Quaternion(Vector3.UP, -warp * 0.45) * _final.rot[1]
 		_final.rot[CHEST] = Quaternion(Vector3.UP, -warp * 0.55) * _final.rot[CHEST]
 		_final.pelvis = Quaternion(Vector3.UP, warp) * _final.pelvis
+	# banking: runners lean into their turns
+	if sel.get("loco", false) and _key != "loco_air" and smoothed_speed > 1.2:
+		var bank := clampf(atan(0.35 * smoothed_speed * yaw_rate / 9.8), -0.32, 0.32)
+		if absf(bank) > 0.005:
+			_final.rot[PELVIS] = Quaternion(Vector3.BACK, bank * 0.5) * _final.rot[PELVIS]
+			_final.rot[CHEST] = Quaternion(Vector3.BACK, bank * 0.5) * _final.rot[CHEST]
 	# rolls go in the roll direction whatever the body faces
 	if action == "roll":
 		var rd: Vector3 = st.get("roll_dir", -root.basis.z)
@@ -436,9 +444,9 @@ func _locomotion(delta: float, st: Dictionary, root: Transform3D, hvel: Vector3)
 	else:
 		_stride_k = 1.0
 	# idle pose, then the gaits mixed over it in proportion to the speed
-	if idle != null:
+	if idle != null and (w_move < 0.999 or wsum <= 0.001):
 		idle.sample(_time, _base)
-	else:
+	elif idle == null:
 		_base.copy_from(MotionPose.new())
 	if wsum > 0.001:
 		var first := true
@@ -459,7 +467,10 @@ func _locomotion(delta: float, st: Dictionary, root: Transform3D, hvel: Vector3)
 					break
 				mixed += g2[1]
 			_tmp2.blend(_tmp, w2 / maxf(mixed + w2, 0.0001))
-		_base.blend(_tmp2, w_move)
+		if w_move >= 0.999:
+			_base.copy_from(_tmp2)
+		else:
+			_base.blend(_tmp2, w_move)
 	_base.grip_w = 0.0
 
 

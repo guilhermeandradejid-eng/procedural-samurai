@@ -251,10 +251,12 @@ func blood_pool_later(ch: Node3D) -> void:
 	if not _gore():
 		return
 	var t := get_tree().create_timer(1.6)
+	var ref: WeakRef = weakref(ch)   # the character may be freed before the pool forms
 	t.timeout.connect(func() -> void:
-		if not is_instance_valid(ch):
+		var who := ref.get_ref() as Node3D
+		if who == null:
 			return
-		var body: RagdollBody = ch.get("body")
+		var body: RagdollBody = who.get("body")
 		if body == null:
 			return
 		var p: Vector3 = (body.parts["belly"] as RigidBody3D).global_position
@@ -437,17 +439,18 @@ func souls(origin: Vector3, count: int, target: Node3D) -> void:
 		var delay := randf() * 0.35
 		var dur := randf_range(0.8, 1.15)
 		var tw := orb.create_tween()
+		var tref: WeakRef = weakref(target)   # the target may be freed while the orbs are still flying
 		tw.tween_interval(delay)
 		tw.tween_method(func(t: float) -> void:
-			if not is_instance_valid(orb):
-				return
-			var dest: Vector3 = target.global_position + Vector3(0, 1.0, 0) if is_instance_valid(target) else origin
+			var tgt := tref.get_ref() as Node3D
+			var dest: Vector3 = tgt.global_position + Vector3(0, 1.0, 0) if tgt else origin
 			var ctrl := origin + up
 			var k := t * t * (3.0 - 2.0 * t)
 			orb.global_position = origin.lerp(ctrl, k).lerp(ctrl.lerp(dest, k), k), 0.0, 1.0, dur)
 		tw.tween_callback(func() -> void:
-			if is_instance_valid(target) and target.has_method("absorb_soul"):
-				target.absorb_soul(gold)
+			var tgt := tref.get_ref() as Node3D
+			if tgt and tgt.has_method("absorb_soul"):
+				tgt.absorb_soul(gold)
 			orb.queue_free())
 
 

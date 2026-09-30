@@ -54,6 +54,8 @@ func _build_views() -> void:
 		_add("moon", eye, eye + tod.moon_direction(tod.time) * 200.0)
 		# ground lit by the sun / moon light
 		_add("ground_lit", eye, eye + Vector3(20, -1.0, -30) * 1.0)
+		# rain hitting the ground, seen from knee height
+		_add("ground_close", s + Vector3(0, 0.75, 0), s + Vector3(1.5, 0.0, -3.5))
 	if not only.is_empty():
 		views = views.filter(func(v): return v.name in only)
 

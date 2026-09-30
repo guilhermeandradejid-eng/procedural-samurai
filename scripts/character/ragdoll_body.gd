@@ -22,9 +22,9 @@ const JOINTS := {
 	"upper_arm_r": ["cone", 150.0, 85.0], "upper_arm_l": ["cone", 150.0, 85.0],
 	"forearm_r": ["hinge", -5.0, 150.0], "forearm_l": ["hinge", -5.0, 150.0],
 	"hand_r": ["cone", 45.0, 35.0], "hand_l": ["cone", 45.0, 35.0],
-	"thigh_r": ["cone", 100.0, 35.0], "thigh_l": ["cone", 100.0, 35.0],
+	"thigh_r": ["cone", 125.0, 40.0], "thigh_l": ["cone", 125.0, 40.0],
 	"shin_r": ["hinge", -150.0, 5.0], "shin_l": ["hinge", -150.0, 5.0],
-	"foot_r": ["cone", 28.0, 12.0], "foot_l": ["cone", 28.0, 12.0],
+	"foot_r": ["cone", 48.0, 22.0], "foot_l": ["cone", 48.0, 22.0],
 }
 
 var character: Node3D

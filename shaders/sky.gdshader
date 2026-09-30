@@ -47,6 +47,22 @@ float hash11(float n) {
 	return fract(sin(n * 127.1) * 43758.5453);
 }
 
+// smooth 3D value noise: no UV seams or poles when sampled with a direction
+float vnoise3(vec3 p) {
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = mix(mix(hash13(i), hash13(i + vec3(1.0, 0.0, 0.0)), f.x),
+			mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), f.x), f.y);
+	float b = mix(mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), f.x),
+			mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), f.x), f.y);
+	return mix(a, b, f.z);
+}
+
+float fbm3(vec3 p) {
+	return vnoise3(p) * 0.55 + vnoise3(p * 2.1 + vec3(3.7, 1.3, 5.9)) * 0.3 + vnoise3(p * 4.3 + vec3(8.1, 6.2, 2.4)) * 0.15;
+}
+
 float cloud_field(vec2 uv, float coverage) {
 	float n = texture(cloud_noise, uv).r * 0.6;
 	n += texture(cloud_noise, uv * 2.3 + vec2(0.31, 0.17)).r * 0.26;
@@ -129,33 +145,33 @@ void sky() {
 			vec3 tint = mix(vec3(1.0, 0.85, 0.7), vec3(0.75, 0.85, 1.0), fract(h * 91.0));
 			col += tint * star * twinkle * clear * star_intensity * (layer == 0 ? 3.0 : 5.0);
 		}
-		// milky way: a bright dusty band with dark lanes
+		// milky way: a soft dusty band with dark rifts (sampled in 3D: no seams, no pole)
 		vec3 mw_n = normalize(vec3(0.3, 0.2, 1.0));
-		float mw = exp(-pow(dot(dir, mw_n) * 3.2, 2.0));
-		vec2 mw_uv = vec2(atan(dir.x, dir.z) * 0.9, dir.y * 2.5);
-		float dust = texture(cloud_noise, mw_uv * 1.3).r;
-		float lane = smoothstep(0.55, 0.75, texture(cloud_detail, mw_uv * 3.0).r);
-		col += vec3(0.07, 0.075, 0.11) * mw * (0.35 + dust) * (1.0 - lane * 0.7) * clear * star_intensity;
-		// shooting star every ~11 s
+		float mwd = dot(dir, mw_n);
+		float mw = exp(-mwd * mwd * 10.0);
+		float dust = fbm3(dir * 3.2 + vec3(1.7, 0.4, 2.9));
+		float lane = smoothstep(0.5, 0.74, fbm3(dir * 6.5 + vec3(4.1, 2.3, 7.7)));
+		col += vec3(0.07, 0.075, 0.11) * mw * (0.3 + dust * 1.1) * (1.0 - lane * 0.65) * clear * star_intensity * 0.8;
+		// a shooting star every ~11 s: a quick thin streak with a fading tail
 		float st = TIME / 11.0;
 		float sid = floor(st);
-		float sf = fract(st) * 3.0;
+		float sf = fract(st) * 12.0;
 		if (sf < 1.0) {
 			vec3 p0 = normalize(vec3(hash11(sid) - 0.5, 0.5 + hash11(sid + 3.0) * 0.5, hash11(sid + 7.0) - 0.5));
 			vec3 v = normalize(cross(p0, vec3(hash11(sid + 11.0) - 0.5, 1.0, hash11(sid + 13.0) - 0.5)));
-			for (int k = 0; k < 6; k++) {
-				float tk = sf - float(k) * 0.025;
+			for (int k = 0; k < 10; k++) {
+				float tk = sf - float(k) * 0.012;
 				vec3 pk = normalize(p0 + v * tk * 0.35);
 				float dd = dot(dir, pk);
-				col += vec3(1.0, 0.95, 0.85) * smoothstep(0.99996 - float(k) * 0.00002, 1.0, dd) * (1.0 - float(k) / 6.0) * clear * 6.0 * (1.0 - sf);
+				col += vec3(1.0, 0.95, 0.85) * smoothstep(0.999992 - float(k) * 0.000003, 1.0, dd) * (1.0 - float(k) / 10.0) * clear * 5.0 * (1.0 - sf);
 			}
 		}
-		// aurora curtains low in the north
+		// aurora curtains low in the north: a faint, soft veil (not a light show)
 		float az = atan(dir.x, dir.z);
-		float curtain = sin(az * 5.0 + TIME * 0.15 + texture(cloud_noise, vec2(az * 0.6, TIME * 0.004)).r * 4.0) * 0.5 + 0.5;
-		float ay = smoothstep(0.08, 0.22, dir.y) * smoothstep(0.62, 0.3, dir.y);
+		float curtain = sin(az * 2.5 + TIME * 0.05 + texture(cloud_noise, vec2(az * 0.35, TIME * 0.002)).r * 3.0) * 0.5 + 0.5;
+		float ay = smoothstep(0.08, 0.3, dir.y) * smoothstep(0.7, 0.36, dir.y);
 		float aur = curtain * curtain * ay * smoothstep(-0.2, 0.9, -dir.z);
-		col += mix(vec3(0.1, 0.9, 0.5), vec3(0.5, 0.25, 0.9), smoothstep(0.25, 0.55, dir.y)) * aur * clear * 0.08;
+		col += mix(vec3(0.1, 0.9, 0.5), vec3(0.5, 0.25, 0.9), smoothstep(0.25, 0.55, dir.y)) * aur * clear * 0.028;
 	}
 	if (LIGHT1_ENABLED) {
 		vec3 md = LIGHT1_DIRECTION;
