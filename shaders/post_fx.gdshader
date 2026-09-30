@@ -20,6 +20,11 @@ uniform vec4 flash_color : source_color = vec4(1.0);
 uniform float lens_rain = 0.0;
 uniform float lens_blood = 0.0;
 uniform vec3 lens_tint : source_color = vec3(0.5, 0.02, 0.02);
+// combat juice: zoom blur towards a point, speed streaks, and the thin "cut" across the screen
+uniform float radial_blur = 0.0;
+uniform vec2 radial_center = vec2(0.5, 0.5);
+uniform float speed_lines = 0.0;
+uniform vec4 slash_line = vec4(0.5, 0.5, 0.0, 0.0);   // xy centre (uv), z angle, w strength
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -62,11 +67,30 @@ void fragment() {
 		gore.z = smoothstep(0.25, 0.6, gore.z);
 	}
 	uv += (wet.xy + gore.xy) * 0.03;
+	// a dimensional cut: the picture is pushed apart along a line through the target
+	float cut_dist = 1.0;
+	if (slash_line.w > 0.001) {
+		vec2 d = uv - slash_line.xy;
+		d.x *= aspect;
+		vec2 dirv = vec2(cos(slash_line.z), sin(slash_line.z));
+		vec2 nrm = vec2(-dirv.y, dirv.x);
+		float sd = dot(d, nrm);
+		cut_dist = abs(sd);
+		uv += vec2(nrm.x / aspect, nrm.y) * sign(sd) * slash_line.w * 0.016 * smoothstep(0.4, 0.0, cut_dist);
+	}
 	vec2 dc = uv - 0.5;
 	float r2 = dot(dc, dc);
 	vec3 col;
 	float ab = aberration + focus * 0.004;
-	if (ab > 0.0005) {
+	if (radial_blur > 0.001) {
+		// zoom blur: average the picture along the way to the centre
+		vec2 dirb = (radial_center - uv) * radial_blur;
+		vec3 acc = vec3(0.0);
+		for (int i = 0; i < 9; i++) {
+			acc += texture(screen_tex, uv + dirb * (float(i) / 8.0)).rgb;
+		}
+		col = acc / 9.0;
+	} else if (ab > 0.0005) {
 		vec2 off = dc * ab * (0.5 + r2 * 2.0);
 		col.r = texture(screen_tex, uv + off).r;
 		col.g = texture(screen_tex, uv).g;
@@ -97,6 +121,21 @@ void fragment() {
 	col = mix(col, col * vec3(1.0, 0.75, 0.75), low_health * edge * 0.6);
 	// vignette
 	col *= 1.0 - (vignette + low_health * 0.25 + focus * 0.2) * smoothstep(0.12, 0.75, r2 * 1.7);
+	// speed streaks radiating from the centre (sprints, lunges)
+	if (speed_lines > 0.01) {
+		vec2 q = (uv - 0.5) * vec2(aspect, 1.0);
+		float sector = floor(atan(q.y, q.x) * 34.0 + hash(vec2(floor(TIME * 18.0), 1.0)) * 6.0);
+		float rnd = hash(vec2(sector, floor(TIME * 20.0)));
+		float line = smoothstep(0.86, 1.0, rnd) * smoothstep(0.3, 0.9, length(q));
+		col += vec3(line * speed_lines * 0.17);
+	}
+	// the cut itself: a hairline of light that widens and fades as the picture closes again
+	if (slash_line.w > 0.001) {
+		float wl = 0.0018 + (1.0 - slash_line.w) * 0.008;
+		float core = smoothstep(wl, 0.0, cut_dist);
+		float glow = smoothstep(0.05, 0.0, cut_dist) * 0.3;
+		col += vec3(1.0, 0.97, 0.9) * (core * 1.5 + glow) * slash_line.w;
+	}
 	// grain
 	float g = hash(uv * 1000.0 + fract(TIME * 7.3) * 100.0) - 0.5;
 	col += g * (grain + kurosawa * 0.07);

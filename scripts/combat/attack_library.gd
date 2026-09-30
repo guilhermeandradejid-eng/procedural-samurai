@@ -101,9 +101,9 @@ static func _build() -> void:
 			key(0.68, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["light_3"] = {   # kaiten-zan: a low coil then a spinning slash all the way round (Onimusha flourish)
-		"name": "light_3", "clip": "katana_light_3", "duration": 0.86, "active": [0.2, 0.46], "damage": 26.0, "guard_damage": 24.0,
+		"name": "light_3", "clip": "katana_light_3", "duration": 0.86, "active": [0.06, 0.46], "hit_reach": 1.5, "ideal": 0.9, "damage": 26.0, "guard_damage": 24.0,
 		"step": 0.75, "step_window": [0.1, 0.34], "cancel": 0.6, "swing_time": 0.2, "hitstop": 0.085,
-		"cut": "horizontal", "next": "light_1", "power": 1.35, "spin": [0.16, 0.46, 330.0], "wide": true,
+		"cut": "horizontal", "next": "light_1", "power": 1.35, "spin": [0.14, 0.46, -330.0], "wide": true,
 		"keys": [g,
 			key(0.12, Vector3(-0.36, 0.95, 0.15), Vector3(-0.8, -0.3, 0.5), Vector3(0.3, 0.0, -0.95), -50.0, -2.0, 0.17, "out"),
 			key(0.2, Vector3(0.46, 1.16, -0.12), Vector3(0.95, 0.05, -0.3), Vector3(0.0, -1.0, 0.0), 30.0, 4.0, 0.12, "in"),
@@ -204,9 +204,9 @@ static func _build() -> void:
 			key(1.35, kg.pos, kg.dir, kg.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["sweep"] = {
-		"name": "sweep", "clip": "kanabo_sweep", "duration": 1.1, "active": [0.48, 0.66], "damage": 24.0, "guard_damage": 40.0,
+		"name": "sweep", "clip": "kanabo_sweep", "duration": 1.1, "active": [0.4, 0.76], "hit_reach": 1.3, "damage": 24.0, "guard_damage": 40.0,
 		"step": 0.5, "step_window": [0.4, 0.6], "cancel": 0.95, "swing_time": 0.45, "hitstop": 0.1,
-		"cut": "crush", "power": 1.8,
+		"cut": "crush", "power": 1.8, "spin": [0.38, 0.76, -360.0],
 		"keys": [kg,
 			key(0.4, Vector3(0.45, 1.3, 0.1), Vector3(0.85, 0.2, 0.45), Vector3(0, 0, -1), 45.0, -4.0, 0.05, "out"),
 			key(0.58, Vector3(0.0, 1.2, -0.6), Vector3(-0.2, 0.0, -0.98), Vector3(-1, 0, 0), 0.0, 6.0, 0.08, "in"),

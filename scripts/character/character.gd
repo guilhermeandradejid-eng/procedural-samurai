@@ -467,7 +467,7 @@ func _update_action(delta: float) -> void:
 				_sweep_sound_done = true
 				Audio.play_at("swing_heavy" if float(attack.get("power", 1.0)) > 1.4 else "swing", weapon.tip(), -2.0, 0.1)
 			if action_time >= act[0] and action_time <= act[1] and not weapon.sweeping:
-				weapon.begin_sweep(_trail_color())
+				weapon.begin_sweep(_trail_color(), float(attack.get("hit_reach", 1.0)))
 			elif action_time > act[1] and weapon.sweeping:
 				weapon.end_sweep()
 				if attack.get("slam", false):

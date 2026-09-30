@@ -21,6 +21,8 @@ var values := {
 	"ambience_volume": 0.8,
 	"gore": true,
 	"camera_shake": 1.0,
+	"motion_blur": 1.0,   # zoom blur and speed streaks
+	"combat_fx": 1.0,     # wind slashes, afterimages
 	"show_hud": true,
 	"day_length_minutes": 36.0,
 	"difficulty": 1,   # 0 historia, 1 normal, 2 dificil, 3 letal

@@ -22,6 +22,7 @@ var in_hand := false
 var sweeping := false
 var dropped := false
 var hit_set := {}
+var reach_mult := 1.0        # generous hitbox: some sweeps cut further than the visible blade
 var _prev_pts: Array[Vector3] = []
 var _query := PhysicsRayQueryParameters3D.new()
 var _glint := 0.0
@@ -167,10 +168,12 @@ func _follow_grip() -> void:
 	transform = Transform3D(local.basis.orthonormalized() * Basis.from_scale(Vector3.ONE * body.scale_factor * AttackLibrary.WEAPON_SCALE), local.origin)
 
 
-func blade_points(n := 6) -> Array[Vector3]:
+func blade_points(n := 6, hit := false) -> Array[Vector3]:
 	var pts: Array[Vector3] = []
 	var a: float = data.get("blade_start", 0.05)
 	var b: float = data.get("blade_end", 0.75)
+	if hit:
+		b *= reach_mult
 	var xf := global_transform
 	for i in n:
 		var t := float(i) / float(n - 1)
@@ -182,16 +185,18 @@ func tip() -> Vector3:
 	return global_transform * Vector3(0.0, float(data.get("blade_end", 0.75)), 0.0)
 
 
-func begin_sweep(color := Color(1.0, 0.97, 0.9, 0.9)) -> void:
+func begin_sweep(color := Color(1.0, 0.97, 0.9, 0.9), reach := 1.0) -> void:
 	trail.set_color(color)
 	sweeping = true
+	reach_mult = reach
 	hit_set.clear()
-	_prev_pts = blade_points()
+	_prev_pts = blade_points(6, true)
 	trail.active = true
 
 
 func end_sweep() -> void:
 	sweeping = false
+	reach_mult = 1.0
 	trail.active = false
 
 
@@ -222,6 +227,8 @@ func physics_update(delta: float) -> void:
 		trail.push(pts[1], pts[pts.size() - 1])
 	if not sweeping:
 		return
+	if reach_mult > 1.001:
+		pts = blade_points(6, true)
 	var space := get_world_3d().direct_space_state
 	var n := pts.size()
 	for i in n:

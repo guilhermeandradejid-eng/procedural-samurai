@@ -116,7 +116,8 @@ func _physics_process(_delta: float) -> void:
 		var tg: Transform3D = a.body.targets.get("hand_r", Transform3D())
 		var tgl: Vector3 = inv * tg.origin
 		var hand: Vector3 = inv * (a.body.parts["hand_r"] as Node3D).global_position
-		print("d=%.2f step=%.2f " % [Vector2(a.global_position.x - t.global_position.x, a.global_position.z - t.global_position.z).length(), a.attack_step], "t=%.2f sweep=%s grip=%s tip=%s hand=%s hand_tgt=%s str=%.2f" % [a.action_time, a.weapon.sweeping, _v(gripl), _v(tipl), _v(hand), _v(tgl), a.body.strength])
+		var tipw: Vector3 = a.weapon.tip() - t.global_position
+		print("d=%.2f step=%.2f yaw=%.0f " % [Vector2(a.global_position.x - t.global_position.x, a.global_position.z - t.global_position.z).length(), a.attack_step, rad_to_deg(a.rotation.y)], "t=%.2f sweep=%s grip=%s tip=%s hand=%s hand_tgt=%s str=%.2f tip_to_target=%.2f" % [a.action_time, a.weapon.sweeping, _v(gripl), _v(tipl), _v(hand), _v(tgl), a.body.strength, Vector2(tipw.x, tipw.z).length()])
 		if OS.get_environment("TRACE_BLADE") != "":
 			var gw: Transform3D = a.animator.grip_world(Transform3D(a.global_basis.orthonormalized(), a.global_position))
 			var bd_anim: Vector3 = a.global_basis.inverse() * gw.basis.y

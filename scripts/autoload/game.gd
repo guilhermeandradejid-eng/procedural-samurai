@@ -23,10 +23,16 @@ signal screen_flash(color: Color, amount: float)
 signal kurosawa_pulse(duration: float)
 ## The player landed a cut (power of the blow); the HUD counts combos.
 signal combo_hit(power: float)
+## Combat juice for the post-processing layer.
+signal radial_blur(strength: float, world_pos: Vector3, duration: float)
+signal slash_line(world_pos: Vector3, angle: float, duration: float)
 
 
 func flash(color: Color, amount := 0.5) -> void:
 	screen_flash.emit(color, amount)
+
+## 0..1, written every frame by the player: how fast the world should feel (speed streaks).
+var speed_fx := 0.0
 
 enum State { LOADING, TITLE, PLAYING, PAUSED, DEAD, CUTSCENE }
 

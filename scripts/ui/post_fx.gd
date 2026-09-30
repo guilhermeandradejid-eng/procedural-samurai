@@ -21,6 +21,17 @@ var lens_tint := Color(0.5, 0.02, 0.02)
 var lens_rain := 0.0
 var flash_color := Color(1, 1, 1, 0)
 var _pulse_left := 0.0
+# combat juice
+var _blur := 0.0
+var _blur_peak := 0.0
+var _blur_time := 0.0
+var _blur_total := 0.1
+var _blur_world := Vector3.ZERO
+var _cut := 0.0
+var _cut_total := 0.3
+var _cut_world := Vector3.ZERO
+var _cut_angle := 0.0
+var _speed := 0.0
 
 
 func _ready() -> void:
@@ -43,6 +54,18 @@ func _ready() -> void:
 	Game.lens_splash.connect(func(amount: float, color: Color) -> void:
 		lens_blood = clampf(lens_blood + amount, 0.0, 1.2)
 		lens_tint = color)
+	Game.radial_blur.connect(func(strength: float, world_pos: Vector3, duration: float) -> void:
+		if strength >= _blur:
+			_blur_peak = strength
+			_blur = strength
+			_blur_time = 0.0
+			_blur_total = maxf(duration, 0.04)
+			_blur_world = world_pos)
+	Game.slash_line.connect(func(world_pos: Vector3, angle: float, duration: float) -> void:
+		_cut = 1.0
+		_cut_total = maxf(duration, 0.08)
+		_cut_world = world_pos
+		_cut_angle = angle)
 	kurosawa_on = bool(Settings.get_value("kurosawa", false))
 
 
@@ -91,6 +114,7 @@ func _process(delta: float) -> void:
 		rain_target = world.weather.rain
 	lens_rain = lerpf(lens_rain, rain_target * 0.55, clampf(real * 0.5, 0.0, 1.0))
 	flash_color.a = maxf(0.0, flash_color.a - real * 4.5)
+	_update_juice(real)
 	mat.set_shader_parameter("flash_color", flash_color)
 	mat.set_shader_parameter("lens_blood", lens_blood)
 	mat.set_shader_parameter("lens_tint", Vector3(lens_tint.r, lens_tint.g, lens_tint.b))
@@ -103,3 +127,35 @@ func _process(delta: float) -> void:
 	mat.set_shader_parameter("fade", fade)
 	mat.set_shader_parameter("letterbox", letterbox)
 	mat.set_shader_parameter("grain", 0.022 + low * 0.03)
+
+
+## Screen position (uv) of a world point; the centre of the screen when it is behind the camera.
+func _screen_uv(world: Vector3) -> Vector2:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null or cam.is_position_behind(world):
+		return Vector2(0.5, 0.5)
+	var size := get_viewport().get_visible_rect().size
+	var p := cam.unproject_position(world)
+	return Vector2(clampf(p.x / size.x, -0.2, 1.2), clampf(p.y / size.y, -0.2, 1.2))
+
+
+func _update_juice(real: float) -> void:
+	# zoom blur: a hard snap that eases out
+	if _blur > 0.0:
+		_blur_time += real
+		var k := clampf(_blur_time / _blur_total, 0.0, 1.0)
+		_blur = _blur_peak * (1.0 - k) * (1.0 - k)
+		if k >= 1.0:
+			_blur = 0.0
+	# fast movement: a little blur and streaks around the edges
+	_speed = lerpf(_speed, Game.speed_fx, clampf(real * 6.0, 0.0, 1.0))
+	var blur_total := _blur + _speed * 0.018
+	mat.set_shader_parameter("radial_blur", blur_total * float(Settings.get_value("motion_blur", 1.0)))
+	var centre := _screen_uv(_blur_world) if _blur > 0.0 else Vector2(0.5, 0.5)
+	mat.set_shader_parameter("radial_center", centre)
+	mat.set_shader_parameter("speed_lines", _speed * float(Settings.get_value("motion_blur", 1.0)))
+	# the cut across the screen
+	if _cut > 0.0:
+		_cut = maxf(0.0, _cut - real / _cut_total)
+	var c := _screen_uv(_cut_world)
+	mat.set_shader_parameter("slash_line", Vector4(c.x, c.y, _cut_angle, _cut))

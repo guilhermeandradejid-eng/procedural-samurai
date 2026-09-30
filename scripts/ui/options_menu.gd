@@ -27,6 +27,8 @@ func _ready() -> void:
 	_slider("Efeitos", "sfx_volume", 0.0, 1.0, 0.05)
 	_slider("Ambiente", "ambience_volume", 0.0, 1.0, 0.05)
 	_slider("Tremor de câmera", "camera_shake", 0.0, 1.5, 0.05)
+	_slider("Desfoque de movimento", "motion_blur", 0.0, 1.5, 0.05)
+	_slider("Efeitos de combate", "combat_fx", 0.0, 1.5, 0.05)
 	_slider("Duração do dia (min)", "day_length_minutes", 12.0, 90.0, 1.0)
 	_toggle("Sangue e desmembramento", "gore")
 	_toggle("Modo Kurosawa", "kurosawa")
