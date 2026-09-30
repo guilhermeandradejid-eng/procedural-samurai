@@ -23,6 +23,9 @@ var sweeping := false
 var dropped := false
 var hit_set := {}
 var reach_mult := 1.0        # generous hitbox: some sweeps cut further than the visible blade
+var _tip_vel := Vector3.ZERO
+var _last_tip := Vector3.ZERO
+var _last_tip_ok := false
 var _prev_pts: Array[Vector3] = []
 var _query := PhysicsRayQueryParameters3D.new()
 var _glint := 0.0
@@ -181,6 +184,11 @@ func blade_points(n := 6, hit := false) -> Array[Vector3]:
 	return pts
 
 
+## World velocity of the blade tip (m/s), as of the last physics frame.
+func tip_velocity() -> Vector3:
+	return _tip_vel
+
+
 func tip() -> Vector3:
 	return global_transform * Vector3(0.0, float(data.get("blade_end", 0.75)), 0.0)
 
@@ -223,6 +231,10 @@ func physics_update(delta: float) -> void:
 		return
 	_follow_grip()
 	var pts := blade_points()
+	var cur_tip := pts[pts.size() - 1]
+	_tip_vel = (cur_tip - _last_tip) / maxf(delta, 1e-4) if _last_tip_ok else Vector3.ZERO
+	_last_tip = cur_tip
+	_last_tip_ok = true
 	if trail.active or sweeping:
 		trail.push(pts[1], pts[pts.size() - 1])
 	if not sweeping:

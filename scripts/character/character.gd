@@ -52,6 +52,8 @@ var attack_target: Character = null
 var attack_step := 0.0
 var attack_step_window := Vector2.ZERO
 var _loco := Vector3.ZERO   # locomotion part of the horizontal velocity
+var _juice_done := false    # the wind slash of the current swing was thrown
+var _ghost_t := 0.0
 var _anim_acc := 0.0        # time owed to the animator while a far character skips frames
 var _anim_tick := 0
 var landed := 0.0
@@ -161,6 +163,7 @@ func _physics_process(delta: float) -> void:
 	_update_action(delta)
 	_update_stats(delta)
 	_move(delta)
+	_ghost_trail(delta)
 	if body.kinematic:
 		# far away characters animate at half rate: nobody can tell at that distance
 		_anim_acc += delta
@@ -287,6 +290,53 @@ func _move(delta: float) -> void:
 		body.snap_to_targets()
 
 
+## The wave of cut air that leaves a swing at its fastest moment (Devil May Cry style).
+func _swing_juice() -> void:
+	if weapon == null or not weapon.in_hand:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.global_position.distance_squared_to(global_position) > 1600.0:
+		return
+	var power := float(attack.get("power", 1.0))
+	var fwd := -global_basis.z
+	var sweep := weapon.tip_velocity()
+	if sweep.length() < 1.0:
+		sweep = global_basis.x
+	var mid := (weapon.global_position + weapon.tip()) * 0.5
+	var thrust: bool = attack.get("cut", "") == "thrust"
+	var size := clampf(0.75 + power * 0.32, 0.85, 1.9)
+	if team != Team.PLAYER:
+		size *= 0.8
+	FX.wind_slash(mid + fwd * 0.55, fwd, sweep.normalized(), size, _trail_color(), 0.24 + 0.05 * power, not thrust)
+	if team == Team.PLAYER and power >= 1.6:
+		FX.afterimage(self, Color(1.0, 0.72, 0.38), 0.36, 0.5)
+
+
+## Afterimages while the player dashes: a lunge, a roll, a sprint.
+func _ghost_trail(delta: float) -> void:
+	if team != Team.PLAYER or dead:
+		return
+	var rate := 0.0
+	var col := Color(0.55, 0.8, 1.0)
+	var a := 0.4
+	if action == "attack" and attack_step > 0.8 and action_time >= attack_step_window.x and action_time <= attack_step_window.y + 0.04:
+		rate = 0.045
+	elif action == "roll":
+		rate = 0.06
+		col = Color(0.78, 0.9, 1.0)
+		a = 0.3
+	elif action == "" and move_speed > 5.0:
+		rate = 0.12
+		a = 0.18
+	if rate <= 0.0:
+		_ghost_t = 0.0
+		return
+	_ghost_t -= delta
+	if _ghost_t <= 0.0:
+		_ghost_t = rate
+		FX.afterimage(self, col, 0.3, a)
+
+
 func on_footstep(pos: Vector3, speed: float) -> void:
 	if dead or crouching and speed < 2.5:
 		return
@@ -344,6 +394,7 @@ func start_attack(name: String) -> bool:
 	attack = a
 	set_action("attack", float(a.duration))
 	_sweep_sound_done = false
+	_juice_done = false
 	aim_attack_at(_attack_target())
 	attack_started.emit(self, a)
 	return true
@@ -466,6 +517,9 @@ func _update_action(delta: float) -> void:
 			if not _sweep_sound_done and action_time >= float(attack.get("swing_time", act[0])):
 				_sweep_sound_done = true
 				Audio.play_at("swing_heavy" if float(attack.get("power", 1.0)) > 1.4 else "swing", weapon.tip(), -2.0, 0.1)
+			if not _juice_done and action_time >= lerpf(float(act[0]), float(act[1]), 0.45):
+				_juice_done = true
+				_swing_juice()
 			if action_time >= act[0] and action_time <= act[1] and not weapon.sweeping:
 				weapon.begin_sweep(_trail_color(), float(attack.get("hit_reach", 1.0)))
 			elif action_time > act[1] and weapon.sweeping:
@@ -483,10 +537,10 @@ func _update_action(delta: float) -> void:
 			knock_timer -= delta
 			var still: bool = (body.parts["pelvis"] as RigidBody3D).linear_velocity.length() < 1.0
 			if knock_timer <= 0.0 and still and not crippled:
-				set_action("getup", 0.9)
+				set_action("getup", 1.6)
 				animator.initialized = false
 		"getup":
-			body.strength = clampf(action_time / 0.7, 0.05, 1.0)
+			body.strength = clampf(action_time / 0.9, 0.05, 1.0)
 			if action_time >= action_duration:
 				end_action()
 		"stagger", "hit":

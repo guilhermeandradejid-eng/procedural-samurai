@@ -502,3 +502,143 @@ func shockwave(pos: Vector3, color := Color(1.0, 0.9, 0.6), size := 1.0) -> void
 func dust(pos: Vector3, strength := 1.0) -> void:
 	_setup()
 	_particles(pos + Vector3(0, 0.1, 0), Vector3.UP, _mat_dust, _mesh_puff, int(6 * strength) + 2, 1.1, _dust_mat)
+
+
+# ------------------------------------------------------------------ swing juice (Devil May Cry style)
+
+var _wind_shader: Shader
+var _wind_mesh: QuadMesh
+var _ghost_shader: Shader
+var _mat_streaks: ParticleProcessMaterial
+var _streak_mat: StandardMaterial3D
+var _ghosts_alive := 0
+
+
+func _combat_fx() -> float:
+	return float(Settings.get_value("combat_fx", 1.0))
+
+
+func _setup_swing_fx() -> void:
+	if _wind_shader != null:
+		return
+	_setup()
+	_wind_shader = load("res://shaders/wind_slash.gdshader")
+	_ghost_shader = load("res://shaders/afterimage.gdshader")
+	_wind_mesh = QuadMesh.new()
+	_wind_mesh.size = Vector2(3.6, 1.8)
+	# thin streaks of air that outrun the crescent
+	_streak_mat = _spark_mat.duplicate()
+	_streak_mat.albedo_color = Color(0.85, 0.95, 1.0)
+	_streak_mat.emission = Color(0.7, 0.85, 1.0)
+	_streak_mat.emission_energy_multiplier = 5.0
+	_mat_streaks = ParticleProcessMaterial.new()
+	_mat_streaks.direction = Vector3(0, 0, -1)
+	_mat_streaks.spread = 16.0
+	_mat_streaks.initial_velocity_min = 8.0
+	_mat_streaks.initial_velocity_max = 20.0
+	_mat_streaks.damping_min = 5.0
+	_mat_streaks.damping_max = 9.0
+	_mat_streaks.gravity = Vector3.ZERO
+	_mat_streaks.particle_flag_align_y = true
+	_mat_streaks.scale_min = 1.2
+	_mat_streaks.scale_max = 3.0
+	_mat_streaks.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	_mat_streaks.emission_sphere_radius = 0.9
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0.9))
+	g.set_color(1, Color(1, 1, 1, 0.0))
+	var gt := GradientTexture1D.new()
+	gt.gradient = g
+	_mat_streaks.color_ramp = gt
+
+
+## A crescent of cut air thrown along `forward` by a swing whose blade moved along `sweep`
+## (world direction). It bends the picture behind it, leaves streaks and stirs the dust.
+## `size` 1 is a light slash; `color` follows the move.
+func wind_slash(origin: Vector3, forward: Vector3, sweep: Vector3, size := 1.0, color := Color(0.85, 0.95, 1.0), life := 0.3, crescent := true) -> void:
+	var k := _combat_fx()
+	if k <= 0.01:
+		return
+	_setup_swing_fx()
+	var fwd := Vector3(forward.x, 0.0, forward.z)
+	fwd = fwd.normalized() if fwd.length_squared() > 1e-4 else Vector3.FORWARD
+	if not crescent:
+		# a thrust pierces: streaks of air only
+		_particles(origin, fwd, _mat_streaks, _mesh_spark, int(8 + 6 * size * k), 0.3, _streak_mat)
+		return
+	# roll: the crescent's chord follows the swing as it appears on screen, bulging upwards
+	var roll := 0.0
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		var sx := sweep.dot(cam.global_basis.x)
+		var sy := sweep.dot(cam.global_basis.y)
+		if absf(sx) + absf(sy) > 0.05:
+			roll = atan2(sy, sx)
+			if roll > PI * 0.5:
+				roll -= PI
+			elif roll <= -PI * 0.5:
+				roll += PI
+	var mi := MeshInstance3D.new()
+	mi.mesh = _wind_mesh
+	var mat := ShaderMaterial.new()
+	mat.shader = _wind_shader
+	mat.set_shader_parameter("tint", color)
+	mat.set_shader_parameter("roll", roll)
+	mat.set_shader_parameter("energy", 2.4 * clampf(k, 0.4, 1.5))
+	mat.set_shader_parameter("bend", 0.05 * size)
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.extra_cull_margin = 8.0
+	_add(mi)
+	mi.global_position = origin
+	mi.scale = Vector3(0.55, 0.55, 1.0) * size
+	var travel := fwd * (3.4 + 2.4 * size)
+	var tw := mi.create_tween().set_parallel(true)
+	tw.tween_property(mi, "global_position", origin + travel, life).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(mi, "scale", Vector3(1.3, 1.3, 1.0) * size, life).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("age", v), 0.0, 1.0, life)
+	tw.chain().tween_callback(mi.queue_free)
+	# streaks of air and a puff of dust where the wave grazes the ground
+	_particles(origin, fwd, _mat_streaks, _mesh_spark, int(10 + 8 * size * k), 0.34, _streak_mat)
+	var ground := _ray_down(origin)
+	if not ground.is_empty() and origin.y - (ground.position as Vector3).y < 1.4:
+		dust((ground.position as Vector3) + fwd * 0.9, 0.5 + 0.4 * size)
+
+
+## A short-lived translucent copy of a character's pose (dashes, lunges, big strikes).
+func afterimage(ch: Node3D, color := Color(0.55, 0.8, 1.0), life := 0.34, alpha := 0.5) -> void:
+	if _combat_fx() <= 0.01 or ch == null or _ghosts_alive >= 14:
+		return
+	var body: RagdollBody = ch.get("body")
+	if body == null or body.dead:
+		return
+	_setup_swing_fx()
+	var root := Node3D.new()
+	_add(root)
+	var mat := ShaderMaterial.new()
+	mat.shader = _ghost_shader
+	mat.set_shader_parameter("tint", color)
+	mat.set_shader_parameter("alpha", alpha * clampf(_combat_fx(), 0.3, 1.4))
+	var sources: Array[MeshInstance3D] = []
+	for part in body.part_meshes:
+		for mi in body.part_meshes[part]:
+			sources.append(mi)
+	var weapon: Node = ch.get("weapon")
+	if weapon and weapon.get("in_hand"):
+		for c in weapon.find_children("*", "MeshInstance3D", true, false):
+			sources.append(c)
+	for src in sources:
+		if not src.is_visible_in_tree() or src.mesh == null:
+			continue
+		var g := MeshInstance3D.new()
+		g.mesh = src.mesh
+		g.material_override = mat
+		g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(g)
+		g.global_transform = src.global_transform
+	_ghosts_alive += 1
+	var tw := root.create_tween()
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("alpha", v), alpha * clampf(_combat_fx(), 0.3, 1.4), 0.0, life)
+	tw.tween_callback(func() -> void:
+		_ghosts_alive -= 1
+		root.queue_free())

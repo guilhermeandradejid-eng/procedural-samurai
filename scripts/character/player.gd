@@ -57,7 +57,13 @@ func _ready() -> void:
 			var pw := float(info.get("power", 1.0))
 			cam_rig.kick_fov(-2.0 - 2.5 * pw)
 			Game.shake(0.12 + 0.1 * pw)
-			Game.combo_hit.emit(pw))
+			Game.combo_hit.emit(pw)
+			var pt: Vector3 = info.get("point", chest_position())
+			var fx := float(Settings.get_value("combat_fx", 1.0))
+			Game.radial_blur.emit((0.02 + 0.014 * pw) * fx, pt, 0.13)
+			if r == "killed" or pw >= 1.6:
+				# the picture splits along the cut for an instant
+				Game.slash_line.emit(pt, info.get("dir", Vector3.RIGHT), 0.3))
 	died.connect(func(_c: Character, _i: Dictionary) -> void:
 		Game.slowmo(2.5, 0.25)
 		get_tree().create_timer(1.2).timeout.connect(func() -> void: Game.set_state(Game.State.DEAD)))
@@ -131,6 +137,15 @@ func _think(delta: float) -> void:
 	if action == "heal":
 		var h := 45.0 * delta
 		heal(h)
+	# how fast the world should feel: streaks and a touch of zoom blur while sprinting, lunging, rolling
+	var fast := 0.0
+	if sprinting and move_speed > 5.0:
+		fast = 0.55
+	elif action == "roll":
+		fast = 0.5
+	elif action == "attack" and attack_step > 0.8 and action_time >= attack_step_window.x and action_time <= attack_step_window.y:
+		fast = 0.75
+	Game.speed_fx = fast
 	# grass trampling
 	RenderingServer.global_shader_parameter_set("trample_0", Vector4(global_position.x, global_position.y, global_position.z, 0.9))
 

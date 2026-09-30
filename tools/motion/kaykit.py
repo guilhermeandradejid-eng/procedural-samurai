@@ -374,6 +374,8 @@ def bake(name, src, anim, fps=FPS, sword="2H_Sword", grip="sword", left=1.0, loo
     if g is not None and grip == "sword" and strike:
         ts = strike_time(r, g)[0] if strike == "speed" else reach_time(r, g)
         m["strike"] = round(ts, 3)
+    if loop and trim is None:
+        trim = (0.0, (len(pel) - 2) / fps)          # the last key repeats the first
     if trim is not None:
         a, b = int(round(trim[0] * fps)), int(round(trim[1] * fps)) + 1
         pel, rot, c = pel[a:b], rot[a:b], c[a:b]
@@ -384,7 +386,8 @@ def bake(name, src, anim, fps=FPS, sword="2H_Sword", grip="sword", left=1.0, loo
             m["strike"] = round(m["strike"] - t0, 3)
     if ground:
         import posefx
-        pel = posefx.ground_clamp({"pelvis_pos": pel, "rot": rot}, clearance=0.0)["pelvis_pos"]
+        pel = np.ascontiguousarray(pel).copy()
+        posefx.ground_clamp({"pelvis_pos": pel, "rot": rot}, clearance=0.0)
     path = clipio.save(name, fps, loop, pel, rot, c, grip=g, speed=0.0, meta=m, out_dir=out_dir)
     return path, r
 
@@ -404,6 +407,13 @@ CLIPS = {
     "kanabo_sweep": dict(anim="2H_Melee_Attack_Spin", trim=(0.4, 1.7), unspin=True),
     "yari_thrust": dict(anim="2H_Melee_Attack_Stab", strike="reach"),
     "yari_sweep": dict(anim="2H_Melee_Attack_Slice", trim=(0.2, 1.0)),
+    # stances and reactions
+    "guard_idle": dict(anim="2H_Melee_Idle", loop=True, strike=None),
+    "idle": dict(anim="Idle", loop=True, grip=None),
+    "hit_f": dict(anim="Hit_A", grip="hand", strike=None),
+    "stagger": dict(anim="Hit_B", grip="hand", strike=None),
+    "getup": dict(anim="Lie_StandUp", grip="hand", strike=None, ground=True, trim=(0.35, 2.33)),
+    "sit": dict(anim="Sit_Floor_Idle", loop=True, grip=None, ground=True),
 }
 
 

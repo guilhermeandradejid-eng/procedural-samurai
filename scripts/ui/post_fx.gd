@@ -61,11 +61,16 @@ func _ready() -> void:
 			_blur_time = 0.0
 			_blur_total = maxf(duration, 0.04)
 			_blur_world = world_pos)
-	Game.slash_line.connect(func(world_pos: Vector3, angle: float, duration: float) -> void:
+	Game.slash_line.connect(func(world_pos: Vector3, world_dir: Vector3, duration: float) -> void:
 		_cut = 1.0
 		_cut_total = maxf(duration, 0.08)
 		_cut_world = world_pos
-		_cut_angle = angle)
+		# the cut follows the blow as it looks on screen
+		var a := _screen_uv(world_pos)
+		var b := _screen_uv(world_pos + world_dir.normalized())
+		var size := get_viewport().get_visible_rect().size
+		var v := Vector2((b.x - a.x) * size.x / size.y, b.y - a.y)
+		_cut_angle = atan2(v.y, v.x) if v.length() > 0.001 else 0.6)
 	kurosawa_on = bool(Settings.get_value("kurosawa", false))
 
 
