@@ -62,8 +62,8 @@ godot --path . -- --play   # pula a tela de título
   velocidade, o "corte" que racha a tela nos golpes fortes, brasas e luz na lâmina durante a carga do golpe
   pesado (com anel e som ao chegar no máximo), sangue na lente que escorre e some e um quadro de impacto
   em preto, branco e vermelho nos golpes mortais e na última morte de uma luta (opções: *Efeitos de
-  combate* e *Desfoque de movimento*). As lâminas varrem um volume com espessura, então o golpe que
-  encosta visualmente no alvo acerta.
+  combate* e *Desfoque de movimento*; veja `docs/efeitos_de_combate.md`). As lâminas varrem um volume
+  com espessura, então o golpe que encosta visualmente no alvo acerta.
 * **IA**: percepção por visão/ruído, alerta em grupo, fichas de ataque (poucos atacam por vez), fintas,
   golpes telegrafados (lâmina em brasa vermelha = imbloqueável), fuga, patrulhas.
 * **Áudio 100 % sintetizado**: espadas, carne, vozes, sinos, taiko + shakuhachi + koto, ambientes.
