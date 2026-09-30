@@ -97,6 +97,8 @@ python3 tests/make_sheet.py <dir> <prefixo>                          # folha de 
 godot --path . -- --tour <dir> --weather storm --time 17.5          # capturas do mundo (views: sun, moon, ...)
 python3 tools/motion/check_clips.py                                  # sanidade dos clipes de animação
 godot --headless --path . res://tests/track_test.tscn               # erro (cm) entre o clipe e o ragdoll, por ação
+ONLY=player/counter godot --headless --path . res://tests/hit_test.tscn   # matriz de acertos de só alguns golpes
+xvfb-run godot --path . --rendering-driver vulkan res://tests/juice_shots.tscn -- <dir> heavy,charge,impact   # quadros dos efeitos de combate
 ```
 
 Variáveis do `--autotest`: `AUTOTEST_MODE=standoff|assassinate`, `AUTOTEST_FRAMES`, `AUTOTEST_APPROACH`.
