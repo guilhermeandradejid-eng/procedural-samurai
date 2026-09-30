@@ -40,6 +40,7 @@ var part_strength := {}
 var severed := {}
 var dead := false
 var kinematic := false
+var _ctrl_state := {}   # part -> true while it is muscle-driven (slippery), false when it goes limp
 var gear := {}            # piece name -> MeshInstance3D
 var overrides := {}
 var face: Face
@@ -51,6 +52,7 @@ var _blood := {}
 var rng := RandomNumberGenerator.new()
 
 static var _phys_mat: PhysicsMaterial
+static var _ctrl_mat: PhysicsMaterial   # slippery while the body is under muscle control
 static var _cap_mesh: ArrayMesh
 static var _bone_mesh: CapsuleMesh
 
@@ -65,6 +67,13 @@ func build(p_character: Node3D, style: String, scale := 1.0, seed := 0) -> void:
 		_phys_mat = PhysicsMaterial.new()
 		_phys_mat.friction = 0.9
 		_phys_mat.bounce = 0.02
+		# A limb that is being driven to a pose must not stick to the floor: the swing leg
+		# (toes, the rounded end of the shin) used to drag on the ground, which held the knee
+		# bent and made the feet trail up to 30 cm behind the walk cycle. Feet stay put
+		# because the drive pins them, not because of friction.
+		_ctrl_mat = PhysicsMaterial.new()
+		_ctrl_mat.friction = 0.12
+		_ctrl_mat.bounce = 0.0
 	var body_scene: Node3D = (load("res://assets/models/characters/body.glb") as PackedScene).instantiate()
 	var gear_scene: Node3D = (load("res://assets/models/characters/gear.glb") as PackedScene).instantiate()
 	overrides = CharacterStyle.overrides_for(style, rng if seed != 0 else null)
@@ -78,7 +87,7 @@ func build(p_character: Node3D, style: String, scale := 1.0, seed := 0) -> void:
 		rb.mass = float(shape_def.mass) * pow(scale, 3.0)
 		rb.collision_layer = LAYER_ALIVE
 		rb.collision_mask = MASK_ALIVE
-		rb.physics_material_override = _phys_mat
+		rb.physics_material_override = _ctrl_mat
 		rb.can_sleep = false
 		rb.linear_damp = 0.05
 		rb.angular_damp = 0.6
@@ -254,6 +263,10 @@ func drive(delta: float) -> void:
 		var rb: RigidBody3D = parts[part]
 		part_strength[part] = move_toward(part_strength[part], 1.0, delta * 1.8)
 		var k: float = clampf(strength * part_strength[part] * Rig.STIFFNESS[part], 0.0, 1.0)
+		var ctrl := k > 0.4
+		if _ctrl_state.get(part, true) != ctrl:
+			_ctrl_state[part] = ctrl
+			rb.physics_material_override = _ctrl_mat if ctrl else _phys_mat
 		if k < 0.01:
 			continue
 		var tgt: Transform3D = targets[part] * Transform3D(Basis(), com[part])
@@ -353,6 +366,8 @@ func die() -> void:
 	strength = 0.0
 	for part in parts:
 		var rb: RigidBody3D = parts[part]
+		rb.physics_material_override = _phys_mat
+		_ctrl_state[part] = false
 		rb.freeze = false
 		rb.can_sleep = true
 		rb.linear_damp = 0.25
@@ -376,6 +391,8 @@ func sever(part: String, imp := Vector3.ZERO) -> bool:
 	for p in Rig.subtree(part):
 		severed[p] = true
 		var rb: RigidBody3D = parts[p]
+		rb.physics_material_override = _phys_mat
+		_ctrl_state[p] = false
 		rb.collision_layer = LAYER_DEAD
 		rb.collision_mask = MASK_DEAD
 		rb.can_sleep = true

@@ -120,6 +120,17 @@ func _run() -> void:
 			await get_tree().physics_frame
 		var c: Dictionary = cases[name]
 		(c.setup as Callable).call()
+		if OS.get_environment("TRACK_FRICTION") != "":
+			var pm := PhysicsMaterial.new()
+			pm.friction = float(OS.get_environment("TRACK_FRICTION"))
+			pm.bounce = 0.0
+			for pn5 in ch.body.parts:
+				(ch.body.parts[pn5] as RigidBody3D).physics_material_override = pm
+		if OS.get_environment("TRACK_NOCOLL") != "":
+			var which: String = OS.get_environment("TRACK_NOCOLL")
+			for pn0 in ch.body.parts:
+				if which == "all" or which == "1" or pn0 in which.split(","):
+					(ch.body.parts[pn0] as RigidBody3D).collision_mask = 0
 		var frames := int(float(c.t) * float(Engine.physics_ticks_per_second))
 		var mx := {}
 		var sm := {}
@@ -132,7 +143,7 @@ func _run() -> void:
 				var bp: Basis = (ch.body.parts["thigh_l"] as Node3D).global_basis.orthonormalized().inverse() * (ch.body.parts["shin_l"] as Node3D).global_basis.orthonormalized()
 				var ht: Basis = (ch.body.targets["pelvis"] as Transform3D).basis.orthonormalized().inverse() * (ch.body.targets["thigh_l"] as Transform3D).basis.orthonormalized()
 				var hp: Basis = (ch.body.parts["pelvis"] as Node3D).global_basis.orthonormalized().inverse() * (ch.body.parts["thigh_l"] as Node3D).global_basis.orthonormalized()
-				print("knee f%d tgt %.0f phys %.0f | hip(x) tgt %.0f phys %.0f | shin w %.1f thigh w %.1f" % [f, rad_to_deg(bt.get_euler().x), rad_to_deg(bp.get_euler().x), rad_to_deg(ht.get_euler().x), rad_to_deg(hp.get_euler().x),
+				print("knee f%d tgt %.0f (tot %.0f) phys %.0f (tot %.0f) | hip(x) tgt %.0f phys %.0f | shin w %.1f thigh w %.1f" % [f, rad_to_deg(bt.get_euler().x), rad_to_deg(bt.get_rotation_quaternion().get_angle()), rad_to_deg(bp.get_euler().x), rad_to_deg(bp.get_rotation_quaternion().get_angle()), rad_to_deg(ht.get_euler().x), rad_to_deg(hp.get_euler().x),
 					((ch.body.parts["shin_l"] as RigidBody3D).angular_velocity).x, ((ch.body.parts["thigh_l"] as RigidBody3D).angular_velocity).x])
 			if OS.get_environment("TRACK_FREE") != "":
 				for fp2 in OS.get_environment("TRACK_FREE").split(","):
