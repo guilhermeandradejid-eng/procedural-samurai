@@ -60,7 +60,7 @@ vec3 lens_drops(vec2 uv, float aspect, float t, float seed, float cells, float s
 	vec2 q = (f - c) * vec2(1.0, 0.85);
 	float lump = 1.0;
 	if (cluster > 0.0) {
-		float ang = atan(q.y, q.x);
+		float ang = atan(q.y, q.x + 1e-5);
 		lump += cluster * (0.2 * sin(3.0 * ang + h1 * 6.283) + 0.12 * sin(5.0 * ang + h2 * 6.283) + 0.07 * sin(9.0 * ang + h3 * 6.283));
 	}
 	float m = smoothstep(r, r * 0.55, length(q) / lump) * keep * step(0.004, r);
