@@ -57,8 +57,9 @@ void fragment() {
 		wet += lens_drops(uv, aspect, TIME, 7.0, 5.5, 0.42, 0.7) * lens_rain * 0.7;
 	}
 	if (lens_blood > 0.01) {
-		gore = lens_drops(uv, aspect, TIME, 3.0, 4.0, 0.55, 2.2) * lens_blood;
-		gore += lens_drops(uv, aspect, TIME, 11.0, 7.0, 0.4, 1.6) * lens_blood * 0.8;
+		gore = lens_drops(uv, aspect, TIME, 3.0, 7.0, 0.45, 2.2) * lens_blood;
+		gore += lens_drops(uv, aspect, TIME, 11.0, 11.0, 0.4, 1.6) * lens_blood * 0.8;
+		gore.z = smoothstep(0.25, 0.6, gore.z);
 	}
 	uv += (wet.xy + gore.xy) * 0.03;
 	vec2 dc = uv - 0.5;

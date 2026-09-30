@@ -220,8 +220,8 @@ void sky() {
 	// rain curtains hanging under the storm cloud base near the horizon
 	if (storm > 0.25) {
 		float az2 = atan(dir.x, dir.z);
-		float streak = texture(cloud_detail, vec2(az2 * 3.0 + TIME * 0.01, dir.y * 0.7 - TIME * 0.05)).r;
-		float curt = smoothstep(0.34, 0.0, dir.y) * smoothstep(-0.02, 0.05, dir.y) * smoothstep(0.45, 0.85, streak);
+		float streak = texture(cloud_noise, vec2(az2 * 0.35 + TIME * 0.004, dir.y * 0.05 - TIME * 0.006)).r;
+		float curt = smoothstep(0.3, 0.02, dir.y) * smoothstep(-0.02, 0.05, dir.y) * smoothstep(0.5, 0.8, streak) * 0.7;
 		col = mix(col, vec3(0.32, 0.35, 0.4) * (0.4 + 0.6 * day), curt * (storm - 0.25) * 0.75);
 	}
 	col += vec3(0.7, 0.75, 0.9) * lightning * 0.35;
