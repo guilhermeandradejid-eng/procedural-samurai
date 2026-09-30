@@ -24,6 +24,11 @@ var _trail := 1.0
 var _trail_hold := 0.0
 var _help_t := 45.0
 var _last_hp := -1.0
+var combo_label: Label
+var _combo := 0
+var _combo_t := 0.0
+var kanji_label: Label
+var _kanji_tw: Tween
 var _interact: Interactable = null
 var _assassin: Enemy = null
 var _standoff_ok := false
@@ -92,6 +97,28 @@ func _ready() -> void:
 	UIKit.anchor(stats, Control.PRESET_TOP_RIGHT, -340, 20, -20, 220)
 	stats.visible = false
 	add_child(stats)
+	kanji_label = UIKit.label("", 240, "kanji", Color.WHITE, 0)
+	kanji_label.set_anchors_preset(Control.PRESET_CENTER)
+	UIKit.anchor(kanji_label, Control.PRESET_CENTER, -400, -230, 400, 60)
+	kanji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kanji_label.pivot_offset = Vector2(400, 145)
+	kanji_label.modulate.a = 0.0
+	add_child(kanji_label)
+	combo_label = UIKit.label("", 54, "title", Color(1.0, 0.85, 0.3), 10)
+	UIKit.anchor(combo_label, Control.PRESET_TOP_RIGHT, -520, 150, -40, 230)
+	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	combo_label.pivot_offset = Vector2(480, 40)
+	add_child(combo_label)
+	Game.combo_hit.connect(func(_p: float) -> void:
+		_combo += 1
+		_combo_t = 3.2
+		if _combo >= 2:
+			combo_label.text = "%d GOLPES!" % _combo if _combo < 5 else "%d GOLPES!!" % _combo
+			combo_label.scale = Vector2.ONE * 1.5
+			combo_label.modulate = Color(1.0, 0.85 - minf(_combo * 0.06, 0.6), 0.3, 1.0)
+			var tw := combo_label.create_tween()
+			tw.tween_property(combo_label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+	Game.big_kanji.connect(show_kanji)
 	Game.banner.connect(show_banner)
 	Game.toast.connect(show_toast)
 	Game.detection_changed.connect(func(e: Node, v: float) -> void:
@@ -159,6 +186,22 @@ func _next_banner() -> void:
 		Audio.play("banner", -6.0)
 
 
+func show_kanji(text: String, color: Color, duration: float) -> void:
+	kanji_label.text = text
+	kanji_label.add_theme_color_override("font_color", color)
+	kanji_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	kanji_label.add_theme_constant_override("outline_size", 14)
+	kanji_label.add_theme_font_size_override("font_size", 250 if text.length() == 1 else 190)
+	if _kanji_tw:
+		_kanji_tw.kill()
+	kanji_label.modulate.a = 1.0
+	kanji_label.scale = Vector2.ONE * 1.7
+	kanji_label.rotation = randf_range(-0.06, 0.06)
+	_kanji_tw = create_tween().set_parallel(true)
+	_kanji_tw.tween_property(kanji_label, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_kanji_tw.tween_property(kanji_label, "modulate:a", 0.0, 0.35).set_delay(maxf(duration - 0.35, 0.2))
+
+
 func show_toast(text: String) -> void:
 	var l := UIKit.label(text, 22, "medium")
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -203,6 +246,15 @@ func _process(delta: float) -> void:
 		resolve_view.queue_redraw()
 		_standoff_hint_t -= real
 		_update_prompt(p)
+	# combo counter fades when the streak ends
+	if _combo_t > 0.0:
+		_combo_t -= real
+		if _combo_t <= 0.0:
+			_combo = 0
+		elif _combo_t < 0.6:
+			combo_label.modulate.a = _combo_t / 0.6
+	elif combo_label.text != "":
+		combo_label.text = ""
 	# banners
 	if _banner_t >= 0.0:
 		_banner_t += real
@@ -318,6 +370,10 @@ class ResolveView extends Control:
 				draw_colored_polygon(inner, UIKit.GOLD if fill >= 1.0 else Color(0.9, 0.85, 0.7, 0.6))
 			pts.append(pts[0])
 			draw_polyline(pts, Color(0.95, 0.9, 0.8, 0.8), 1.5, true)
+		# posture: a thin bar that empties as guard is worn down
+		var pf := clampf(player.guard / player.max_guard, 0.0, 1.0)
+		draw_rect(Rect2(4, 36, 240, 5), Color(0, 0, 0, 0.45))
+		draw_rect(Rect2(4, 36, 240.0 * pf, 5), Color(0.92, 0.88, 0.75) if pf > 0.35 else UIKit.RED)
 
 
 class MarkerOverlay extends Control:
@@ -361,6 +417,27 @@ class MarkerOverlay extends Control:
 				draw_colored_polygon(PackedVector2Array([tip, l, rr]), Color(col, 0.35 + v * 0.6))
 			else:
 				_diamond(sp, 11.0, col, v)
+		# Sekiro-style posture bars over enemies that are fighting
+		for e in hud.get_tree().get_nodes_in_group("enemies"):
+			var pe := e as Enemy
+			if pe == null or pe.dead or pe.state != Enemy.State.COMBAT:
+				continue
+			var hp := pe.global_position + Vector3(0, (Rig.height() + 0.25) * pe.scale_factor, 0)
+			if cam.is_position_behind(hp) or hp.distance_to(cam.global_position) > 28.0:
+				continue
+			var sp3 := cam.unproject_position(hp)
+			var frac := clampf(1.0 - pe.guard / pe.max_guard, 0.0, 1.0)
+			if frac < 0.05 and pe.posture_broken <= 0.0:
+				continue
+			var w := 56.0
+			var half := w * 0.5 * frac
+			var broken := pe.posture_broken > 0.0
+			var pcol := UIKit.RED if (frac > 0.7 or broken) else Color(0.95, 0.9, 0.8)
+			if broken and int(Time.get_ticks_msec() / 90) % 2 == 0:
+				pcol = Color(1.0, 0.75, 0.2)
+			draw_rect(Rect2(sp3 - Vector2(w * 0.5, 3), Vector2(w, 6)), Color(0, 0, 0, 0.45))
+			draw_rect(Rect2(sp3 - Vector2(half, 2), Vector2(half * 2.0, 4)), pcol)
+			draw_rect(Rect2(sp3 - Vector2(w * 0.5, 3), Vector2(w, 6)), Color(1, 1, 1, 0.5), false, 1.0)
 		# lock-on mark
 		if p.lock_target and is_instance_valid(p.lock_target) and not p.lock_target.dead:
 			var ch := p.lock_target.chest_position()

@@ -19,6 +19,18 @@ signal lens_splash(amount: float, color: Color)
 signal screen_flash(color: Color, amount: float)
 
 
+## Big brush-calligraphy word in the middle of the screen (一閃, 死, 見切...).
+signal big_kanji(text: String, color: Color, duration: float)
+## Black & white film flicker (Issen).
+signal kurosawa_pulse(duration: float)
+## The player landed a cut (power of the blow); the HUD counts combos.
+signal combo_hit(power: float)
+
+
+func kanji(text: String, color := Color(0.95, 0.9, 0.85), duration := 1.1) -> void:
+	big_kanji.emit(text, color, duration)
+
+
 func flash(color: Color, amount := 0.5) -> void:
 	screen_flash.emit(color, amount)
 

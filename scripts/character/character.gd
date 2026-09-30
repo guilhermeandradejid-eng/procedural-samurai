@@ -46,6 +46,7 @@ var accel_ground := 32.0
 var accel_air := 5.0
 var external_velocity := Vector3.ZERO
 var crippled := false
+var posture_broken := 0.0        # seconds left of the Sekiro-style opening
 var can_lose_limbs := true
 var attack_target: Character = null
 var attack_step := 0.0
@@ -150,6 +151,8 @@ func anim_state() -> Dictionary:
 func _physics_process(delta: float) -> void:
 	if dead:
 		body.drive(delta)
+		if body.face and body.face.has_eyes():
+			body.face.update(delta, body.part_transform("head"), null, "dead")
 		return
 	_think(delta)
 	_update_action(delta)
@@ -158,6 +161,8 @@ func _physics_process(delta: float) -> void:
 	animator.update(delta, anim_state())
 	landed = 0.0
 	body.drive(delta)
+	if body.face and body.face.has_eyes():
+		body.face.update(delta, body.part_transform("head"), look_target, _mood())
 	if weapon:
 		weapon.physics_update(delta)
 
@@ -169,6 +174,7 @@ func _think(_delta: float) -> void:
 
 func _update_stats(delta: float) -> void:
 	invulnerable = maxf(0.0, invulnerable - delta)
+	posture_broken = maxf(0.0, posture_broken - delta)
 	terrified = maxf(0.0, terrified - delta)
 	if action != "block" and action != "attack":
 		guard = minf(max_guard, guard + guard_regen * delta)
@@ -241,8 +247,16 @@ func _move(delta: float) -> void:
 		_on_landed(_fall_speed)
 		_fall_speed = 0.0
 	_was_on_floor = on_floor
+	# spinning attacks turn the whole body at a fixed rate
+	var spinning := false
+	if action == "attack" and attack.has("spin"):
+		var sp: Array = attack.spin
+		if action_time >= float(sp[0]) and action_time <= float(sp[1]):
+			rotation.y += deg_to_rad(float(sp[2])) * delta / (float(sp[1]) - float(sp[0]))
+			face_dir = -global_basis.z
+			spinning = true
 	# turning
-	if face_dir.length_squared() > 0.01 and action != "roll" and action != "knockdown":
+	if not spinning and face_dir.length_squared() > 0.01 and action != "roll" and action != "knockdown":
 		var target_yaw := atan2(-face_dir.x, -face_dir.z)
 		var rate := turn_rate
 		if action == "attack":
@@ -405,11 +419,23 @@ func knockdown(impulse: Vector3) -> void:
 	body.impulse("chest", impulse)
 
 
-func stagger(dir: Vector3, strength := 1.0) -> void:
+## Posture (guard) shattered: the character reels and is open to a deathblow.
+func break_posture(dir: Vector3) -> void:
+	if dead:
+		return
+	guard = max_guard * 0.35
+	posture_broken = 2.4
+	stagger(dir, 1.4, 2.4)
+	FX.shockwave(chest_position(), Color(1.0, 0.85, 0.5), 1.3)
+	FX.comic(chest_position() + Vector3(0, 0.5, 0), ["CRAC!", "POSTURA!", "TILT!"][randi() % 3], Color(1.0, 0.9, 0.4), 1.2)
+	Audio.play_at("guard_break", chest_position(), 3.0)
+
+
+func stagger(dir: Vector3, strength := 1.0, duration := 0.9) -> void:
 	if dead:
 		return
 	hit_dir = dir.normalized()
-	set_action("stagger", 0.9)
+	set_action("stagger", duration)
 	blocking = false
 	external_velocity += hit_dir * 3.5 * strength
 	body.strength = 0.35
@@ -431,6 +457,8 @@ func _update_action(delta: float) -> void:
 				weapon.begin_sweep(_trail_color())
 			elif action_time > act[1] and weapon.sweeping:
 				weapon.end_sweep()
+				if attack.get("slam", false):
+					_slam()
 			if queued_attack != "" and action_time >= float(attack.get("cancel", 99.0)):
 				var q := queued_attack
 				queued_attack = ""
@@ -495,8 +523,13 @@ func _on_weapon_struck(target: Node, part: String, point: Vector3, dir: Vector3)
 			weapon.add_blood(0.18 if result == "hit" else 0.35)
 		"parried":
 			weapon.end_sweep()
-			stagger(-(-global_basis.z), 1.2)
 			weapon.glint(Color(1.0, 0.85, 0.5), 0.4)
+			# a deflect shakes the attacker's posture; enough of them and it breaks
+			guard -= 28.0
+			if guard <= 0.0:
+				break_posture(-(-global_basis.z))
+			else:
+				stagger(-(-global_basis.z), 1.2)
 		"blocked":
 			external_velocity += global_basis.z * 1.5
 
@@ -536,15 +569,26 @@ func receive_hit(info: Dictionary) -> String:
 		Game.shake(0.25)
 		Game.hitstop(0.05)
 		if guard <= 0.0 or info.get("breaks_guard", false):
-			guard = max_guard * 0.35
-			stagger(dir, 1.3)
-			Audio.play_at("guard_break", point, 2.0)
+			break_posture(dir)
 			return "guard_broken"
 		external_velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 1.8
 		body.weaken("chest", 0.5)
 		return "blocked"
 	# the hit lands
 	var dmg: float = info.get("damage", 10.0)
+	# Sekiro deathblow: a broken posture makes the next cut fatal
+	if posture_broken > 0.0 and attacker != null and attacker.team == Team.PLAYER and team == Team.ENEMY and not info.get("fall", false):
+		var boss := style in ["brute", "leader"]
+		dmg = max_health * (0.6 if boss else 2.0)
+		info = info.duplicate()
+		info.power = 3.0
+		info.deathblow = true
+		posture_broken = 0.0
+		Game.kanji("死", Color(0.85, 0.05, 0.04), 1.0)
+		Game.flash(Color(0.9, 0.05, 0.03), 0.5)
+		Game.slowmo(1.2, 0.14)
+		Audio.play("deathblow", 0.0)
+		FX.blood_burst(point, dir, 3.4)
 	health -= dmg
 	hit_dir = Vector3(dir.x, 0.0, dir.z).normalized()
 	var part: String = info.get("part", "chest")
@@ -660,6 +704,32 @@ func _on_part_sliced(part: String, chunk: RigidBody3D, wpoint: Vector3, wnormal:
 
 func _on_dodged(_info: Dictionary) -> void:
 	pass
+
+
+## The blade bites into the ground: dust, sparks, a ring and a shake (heavy strike).
+func _slam() -> void:
+	var tip := weapon.tip()
+	var wd := WorldData.current
+	if wd:
+		tip.y = maxf(tip.y, wd.get_height(tip.x, tip.z))
+	FX.dust(tip, 2.4)
+	FX.sparks(tip, Vector3.UP, 1.2)
+	FX.shockwave(tip + Vector3(0, 0.15, 0), Color(1.0, 0.85, 0.55), 1.5)
+	FX.comic(tip + Vector3(0, 0.5, 0), ["BAM!", "TOC!", "KRAK!"][randi() % 3], Color(1.0, 0.7, 0.2), 1.3)
+	Audio.play_at("land", tip, 4.0)
+	Game.shake(0.4)
+
+
+func _mood() -> String:
+	if dead:
+		return "dead"
+	if action in ["hit", "stagger", "knockdown"]:
+		return "hurt"
+	if action in ["attack", "block", "parry"]:
+		return "angry" if team == Team.ENEMY else "focus"
+	if combat:
+		return "focus"
+	return "calm"
 
 
 func _trail_color() -> Color:

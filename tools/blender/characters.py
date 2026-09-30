@@ -158,7 +158,8 @@ def build_body():
     objs.append(_part("chest", chest))
 
     def head(B):
-        superellipsoid(B, "skin", (0.0, 1.665, 0.0), (0.265, 0.33, 0.265), p=0.82, segs=24, rings=16)
+        # a round bean head, a touch wider than tall (Human Fall Flat), never egg-shaped
+        superellipsoid(B, "skin", (0.0, 1.66, 0.0), (0.31, 0.285, 0.295), p=0.92, segs=28, rings=18)
     objs.append(_part("head", head))
 
     for side, sx in (("r", 1.0), ("l", -1.0)):
@@ -357,10 +358,27 @@ def build_gear():
             box(B, "teeth", (-0.032 + i * 0.016, 1.592, -0.138), (0.012, 0.014, 0.01), smooth=True)
     out.append(piece("head__menpo", menpo, head_pivot, thickness=0.008))
 
-    def eyes(B):
-        for sx in (1, -1):
-            superellipsoid(B, "eyes", (0.052 * sx, 1.69, -0.127), (0.028, 0.038, 0.016), p=0.9, segs=12, rings=8)
-    out.append(piece("head__eyes", eyes, head_pivot, sub=0))
+    # ---- eyes: one eyeball per side (sclera, iris, pupil, shine) that the game rotates
+    # to look at things, and an eyelid dome per side that blinks and squints.
+    EYE_C = (0.062, 1.682, -0.108)
+    for name, sx in (("r", 1.0), ("l", -1.0)):
+        c = (EYE_C[0] * sx, EYE_C[1], EYE_C[2])
+
+        def eye(B, c=c, sx=sx):
+            superellipsoid(B, "eye_white", c, (0.072, 0.082, 0.07), p=0.98, segs=20, rings=14)
+            superellipsoid(B, "iris", (c[0] + 0.001 * sx, c[1] - 0.001, c[2] - 0.026), (0.046, 0.052, 0.02), p=0.9, segs=16, rings=8)
+            superellipsoid(B, "eyes", (c[0] + 0.001 * sx, c[1] - 0.001, c[2] - 0.0335), (0.026, 0.03, 0.012), p=0.9, segs=12, rings=6)
+            superellipsoid(B, "eye_shine", (c[0] + 0.011 * sx, c[1] + 0.013, c[2] - 0.0335), (0.012, 0.013, 0.008), p=0.9, segs=8, rings=5)
+        out.append(piece("head__eye_%s" % name, eye, c, sub=0))
+
+        def lid(B, c=c):
+            R = 0.0405
+            prof = []
+            for k in range(0, 9):
+                a = math.radians(k * 90.0 / 8.0)
+                prof.append((-R * math.sin(a), R * math.cos(a) + 0.0005))
+            lathe(B, prof, "skin", center=c, axis="z", sides=20, cap_bottom=False, cap_top=True, smooth=True)
+        out.append(piece("head__lid_%s" % name, lid, c, sub=0))
 
     for style, tilt in (("calm", 6.0), ("angry", -24.0)):
         def brows(B, tilt=tilt):
@@ -372,7 +390,7 @@ def build_gear():
                 def place(p, sx=sx, ang=ang):
                     x = p.x * math.cos(ang) - p.y * math.sin(ang)
                     y = p.x * math.sin(ang) + p.y * math.cos(ang)
-                    return Vector((x + 0.056 * sx, y + 1.738, p.z - 0.121))
+                    return Vector((x + 0.06 * sx, y + 1.748, p.z - 0.128))
                 transform_since(B, v0, place)
         out.append(piece("head__brows_%s" % style, brows, head_pivot, sub=0))
 

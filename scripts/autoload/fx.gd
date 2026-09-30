@@ -363,6 +363,96 @@ func comic(pos: Vector3, text: String, color := Color(1.0, 0.85, 0.2), size := 1
 	tw.tween_callback(l.queue_free)
 
 
+## The red 危 that warns of a perilous (unblockable) attack.
+func peril(pos: Vector3) -> void:
+	var l := Label3D.new()
+	l.text = "危"
+	l.font = UIKit.font("kanji")
+	l.font_size = 128
+	l.pixel_size = 0.0045
+	l.modulate = Color(1.0, 0.12, 0.08)
+	l.outline_modulate = Color(0.1, 0.0, 0.0)
+	l.outline_size = 14
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.shaded = false
+	l.render_priority = 11
+	_add(l)
+	l.global_position = pos
+	l.scale = Vector3.ONE * 0.3
+	var tw := l.create_tween().set_parallel(true)
+	tw.tween_property(l, "scale", Vector3.ONE * 1.3, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 0.25).set_delay(0.55)
+	tw.chain().tween_callback(l.queue_free)
+	shockwave(pos, Color(1.0, 0.15, 0.1), 0.8)
+
+
+## Onimusha-style souls: glowing orbs pour out of a fallen enemy and stream
+## into the player, restoring health (blue) and Resolve (gold).
+func souls(origin: Vector3, count: int, target: Node3D) -> void:
+	_setup()
+	for i in count:
+		var gold := i % 3 == 0
+		var col := Color(1.0, 0.8, 0.3) if gold else Color(0.35, 0.65, 1.0)
+		var orb := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.055
+		sm.height = 0.11
+		sm.radial_segments = 8
+		sm.rings = 4
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = col
+		mat.emission_enabled = true
+		mat.emission = col
+		mat.emission_energy_multiplier = 5.0
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		sm.material = mat
+		orb.mesh = sm
+		orb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var light := OmniLight3D.new()
+		light.light_color = col
+		light.light_energy = 0.9
+		light.omni_range = 2.2
+		orb.add_child(light)
+		var trail := CPUParticles3D.new()
+		trail.amount = 14
+		trail.lifetime = 0.35
+		trail.local_coords = false
+		trail.mesh = sm
+		trail.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		trail.emission_sphere_radius = 0.03
+		trail.gravity = Vector3.ZERO
+		trail.scale_amount_min = 0.25
+		trail.scale_amount_max = 0.45
+		trail.scale_amount_curve = _fade_curve()
+		orb.add_child(trail)
+		_add(orb)
+		orb.global_position = origin
+		var up := Vector3(randf_range(-1.2, 1.2), randf_range(1.2, 2.4), randf_range(-1.2, 1.2))
+		var delay := randf() * 0.35
+		var dur := randf_range(0.8, 1.15)
+		var tw := orb.create_tween()
+		tw.tween_interval(delay)
+		tw.tween_method(func(t: float) -> void:
+			if not is_instance_valid(orb):
+				return
+			var dest: Vector3 = target.global_position + Vector3(0, 1.0, 0) if is_instance_valid(target) else origin
+			var ctrl := origin + up
+			var k := t * t * (3.0 - 2.0 * t)
+			orb.global_position = origin.lerp(ctrl, k).lerp(ctrl.lerp(dest, k), k), 0.0, 1.0, dur)
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(target) and target.has_method("absorb_soul"):
+				target.absorb_soul(gold)
+			orb.queue_free())
+
+
+func _fade_curve() -> Curve:
+	var c := Curve.new()
+	c.add_point(Vector2(0.0, 1.0))
+	c.add_point(Vector2(1.0, 0.0))
+	return c
+
+
 ## Expanding ring + flash, used for parries and heavy impacts.
 func shockwave(pos: Vector3, color := Color(1.0, 0.9, 0.6), size := 1.0) -> void:
 	_setup()

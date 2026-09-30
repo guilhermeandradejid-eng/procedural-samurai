@@ -136,8 +136,16 @@ func update(delta: float, st: Dictionary) -> void:
 	accel = accel.lerp((vel - prev_vel) / maxf(delta, 1e-4), clampf(delta * 6.0, 0.0, 1.0))
 	prev_vel = vel
 	var yaw := root.basis.get_euler().y
-	yaw_rate = lerpf(yaw_rate, wrapf(yaw - prev_yaw, -PI, PI) / maxf(delta, 1e-4), clampf(delta * 6.0, 0.0, 1.0))
+	var dyaw := wrapf(yaw - prev_yaw, -PI, PI)
+	yaw_rate = lerpf(yaw_rate, dyaw / maxf(delta, 1e-4), clampf(delta * 6.0, 0.0, 1.0))
 	prev_yaw = yaw
+	if absf(dyaw) > 0.05 and st.get("action", "") == "attack" and (st.get("attack", {}) as Dictionary).has("spin"):
+		# a spin carries the planted feet round with the body instead of dragging them
+		var spin_basis := Basis(Vector3.UP, dyaw)
+		for f in feet:
+			f.pos = root.origin + spin_basis * (f.pos - root.origin)
+			f.to = root.origin + spin_basis * (f.to - root.origin)
+			f.yaw += dyaw
 	breath += delta
 	if not initialized:
 		_init_feet(root)

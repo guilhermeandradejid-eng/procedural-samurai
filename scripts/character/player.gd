@@ -51,6 +51,13 @@ func _ready() -> void:
 	cam_rig.target = self
 	cam_rig.yaw = rotation.y
 	get_parent().add_child.call_deferred(cam_rig)
+	hit_landed.connect(func(_c: Character, _t: Character, r: String, info: Dictionary) -> void:
+		# every landed cut punches the camera (harder for heavy blows) and feeds the combo counter
+		if r in ["hit", "killed"]:
+			var pw := float(info.get("power", 1.0))
+			cam_rig.kick_fov(-2.0 - 2.5 * pw)
+			Game.shake(0.12 + 0.1 * pw)
+			Game.combo_hit.emit(pw))
 	died.connect(func(_c: Character, _i: Dictionary) -> void:
 		Game.slowmo(2.5, 0.25)
 		get_tree().create_timer(1.2).timeout.connect(func() -> void: Game.set_state(Game.State.DEAD)))
@@ -239,15 +246,67 @@ func _on_dodged(info: Dictionary) -> void:
 		counter_window = 1.0
 		add_resolve_charge(0.2)
 		Audio.play("perfect", -4.0)
+		# Sekiro's mikiri: dodging a perilous thrust puts the attacker off balance
+		var att: Character = info.get("attacker", null)
+		if att and info.get("attack", "") == "thrust" and info.get("unblockable", false):
+			Game.kanji("見切", Color(0.95, 0.85, 0.4), 1.0)
+			FX.comic(att.chest_position() + Vector3(0, 0.5, 0), "MIKIRI!", Color(1.0, 0.9, 0.3), 1.3)
+			att.guard -= 70.0
+			att.break_posture((att.global_position - global_position).normalized())
 
+
+const ISSEN_WINDOW := 0.1
 
 func _on_parried(info: Dictionary) -> void:
 	super._on_parried(info)
 	perfect_move.emit("parry")
+	var att: Character = info.get("attacker", null)
+	# Onimusha's Issen: a parry in the very last instant answers with one flash
+	if att and is_instance_valid(att) and not att.dead and block_time <= ISSEN_WINDOW:
+		_issen(att)
+		return
 	Game.slowmo(0.7, 0.28)
 	counter_window = 1.1
 	add_resolve_charge(0.25)
 	cam_rig.kick_fov(-6.0)
+
+
+func _issen(att: Character) -> void:
+	Game.kanji("一閃", Color(1.0, 1.0, 1.0), 1.3)
+	Game.flash(Color(1, 1, 1), 0.9)
+	Game.kurosawa_pulse.emit(1.2)
+	Game.slowmo(1.7, 0.1)
+	Audio.play("issen", 0.0)
+	counter_window = 0.0
+	invulnerable = 1.0
+	set_action("", 0.0)
+	start_attack("iai")
+	aim_attack_at(att)
+	cam_rig.kick_fov(-10.0)
+	Game.kill_cam_requested.emit(att, 1.4)
+	get_tree().create_timer(0.09, true, false, true).timeout.connect(func() -> void:
+		if not is_instance_valid(att) or att.dead:
+			return
+		var boss := att.style in ["brute", "leader"]
+		var dir := (att.global_position - global_position).normalized()
+		var info := {"attacker": self, "part": "chest", "point": att.chest_position(), "dir": dir,
+			"damage": att.max_health * (0.55 if boss else 3.0), "power": 3.0, "attack": "iai", "unblockable": true,
+			"cut": "horizontal", "blade": weapon.global_basis.y}
+		att.receive_hit(info)
+		hit_landed.emit(self, att, "killed", info), CONNECT_ONE_SHOT)
+	SaveGame.data["issen"] = int(SaveGame.data.get("issen", 0)) + 1
+
+
+## Called by a soul orb that reached the player (Onimusha soul absorption).
+func absorb_soul(gold: bool) -> void:
+	if dead:
+		return
+	if gold:
+		add_resolve_charge(0.12)
+	else:
+		heal(7.0)
+	body.flash("chest", 0.35, Color(0.4, 0.7, 1.0) if not gold else Color(1.0, 0.85, 0.3))
+	Audio.play("soul", -14.0, 0.15)
 
 
 func add_resolve_charge(v: float) -> void:

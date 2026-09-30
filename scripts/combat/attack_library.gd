@@ -70,59 +70,75 @@ static func get_attack(name: String) -> Dictionary:
 static func _build() -> void:
 	var g := guard("katana")
 	# ------------------------------------------------------------ katana
-	_cache["light_1"] = {
-		"name": "light_1", "duration": 0.56, "active": [0.15, 0.3], "damage": 18.0, "guard_damage": 12.0,
-		"step": 0.5, "step_window": [0.08, 0.26], "cancel": 0.36, "swing_time": 0.14, "hitstop": 0.055,
+	# Katana combo, choreographed like the sword games it borrows from: every move
+	# coils (anticipation), whips through the cut with the hips leading, overshoots,
+	# holds a beat and settles back into the guard. Times are seconds; the key
+	# "ease" describes how the motion arrives at that key.
+	_cache["light_1"] = {   # yoko-giri: quick horizontal slash, right to left
+		"name": "light_1", "duration": 0.62, "active": [0.17, 0.31], "damage": 18.0, "guard_damage": 12.0,
+		"step": 0.55, "step_window": [0.06, 0.24], "cancel": 0.38, "swing_time": 0.15, "hitstop": 0.06,
 		"cut": "horizontal", "next": "light_2", "power": 1.0,
 		"keys": [g,
-			key(0.12, Vector3(0.36, 1.3, -0.1), Vector3(0.82, 0.24, 0.52), Vector3(0.2, -0.1, -0.97), 34.0, 0.0, 0.03, "out"),
-			key(0.23, Vector3(0.02, 1.22, -0.54), Vector3(-0.15, 0.05, -1.0), Vector3(-1.0, 0.0, 0.12), 0.0, 4.0, 0.04, "in"),
-			key(0.32, Vector3(-0.36, 1.12, -0.2), Vector3(-0.9, -0.12, 0.42), Vector3(0.25, 0.0, 1.0), -36.0, 6.0, 0.04, "out"),
-			key(0.56, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
+			key(0.09, Vector3(0.44, 1.1, 0.04), Vector3(0.75, 0.12, 0.65), Vector3(0.2, -0.1, -0.97), 46.0, -4.0, 0.06, "out"),
+			key(0.15, Vector3(0.34, 1.22, -0.22), Vector3(0.68, 0.1, -0.72), Vector3(0.2, -0.1, -0.97), 30.0, 0.0, 0.07, "in"),
+			key(0.21, Vector3(0.02, 1.25, -0.6), Vector3(-0.1, 0.02, -1.0), Vector3(-1.0, 0.0, 0.12), 0.0, 7.0, 0.08, "linear"),
+			key(0.27, Vector3(-0.42, 1.16, -0.36), Vector3(-0.92, -0.06, -0.4), Vector3(0.25, 0.0, 1.0), -40.0, 9.0, 0.08, "out"),
+			key(0.34, Vector3(-0.52, 1.12, -0.12), Vector3(-0.96, -0.08, 0.15), Vector3(0.25, 0.0, 1.0), -50.0, 9.0, 0.08, "out"),
+			key(0.44, Vector3(-0.5, 1.1, -0.12), Vector3(-0.95, -0.08, 0.2), Vector3(0.25, 0.0, 1.0), -48.0, 8.0, 0.07, "inout"),
+			key(0.62, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
-	_cache["light_2"] = {
-		"name": "light_2", "duration": 0.6, "active": [0.16, 0.32], "damage": 20.0, "guard_damage": 14.0,
-		"step": 0.55, "step_window": [0.1, 0.28], "cancel": 0.38, "swing_time": 0.15, "hitstop": 0.06,
+	_cache["light_2"] = {   # kesa-giri: rises high on the left, diagonal cut down to the right
+		"name": "light_2", "duration": 0.68, "active": [0.18, 0.34], "damage": 20.0, "guard_damage": 14.0,
+		"step": 0.6, "step_window": [0.08, 0.27], "cancel": 0.4, "swing_time": 0.16, "hitstop": 0.065,
 		"cut": "diagonal_down", "next": "light_3", "power": 1.05,
 		"keys": [g,
-			key(0.13, Vector3(-0.28, 1.54, -0.06), Vector3(-0.35, 0.8, 0.45), Vector3(0.3, 0.1, -0.95), -30.0, -4.0, 0.0, "out"),
-			key(0.25, Vector3(0.02, 1.24, -0.52), Vector3(0.35, -0.05, -0.94), Vector3(0.4, -0.9, 0.0), 2.0, 6.0, 0.05, "in"),
-			key(0.35, Vector3(0.32, 0.92, -0.22), Vector3(0.55, -0.7, 0.45), Vector3(0.1, -0.5, 0.85), 32.0, 10.0, 0.08, "out"),
-			key(0.6, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
+			key(0.1, Vector3(-0.3, 1.62, 0.02), Vector3(-0.3, 0.85, 0.4), Vector3(0.3, 0.1, -0.95), -34.0, -6.0, 0.0, "out"),
+			key(0.16, Vector3(-0.1, 1.5, -0.25), Vector3(-0.1, 0.5, -0.85), Vector3(0.3, 0.1, -0.95), -20.0, -2.0, 0.03, "in"),
+			key(0.23, Vector3(0.06, 1.22, -0.55), Vector3(0.3, -0.1, -0.95), Vector3(0.4, -0.9, 0.0), 6.0, 8.0, 0.08, "linear"),
+			key(0.3, Vector3(0.34, 0.9, -0.3), Vector3(0.55, -0.72, -0.4), Vector3(0.1, -0.5, 0.85), 34.0, 13.0, 0.13, "out"),
+			key(0.38, Vector3(0.44, 0.78, -0.15), Vector3(0.6, -0.75, 0.1), Vector3(0.1, -0.5, 0.85), 40.0, 15.0, 0.15, "out"),
+			key(0.5, Vector3(0.42, 0.8, -0.16), Vector3(0.6, -0.72, 0.12), Vector3(0.1, -0.5, 0.85), 38.0, 14.0, 0.14, "inout"),
+			key(0.68, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
-	_cache["light_3"] = {
-		"name": "light_3", "duration": 0.76, "active": [0.24, 0.4], "damage": 28.0, "guard_damage": 22.0,
-		"step": 0.95, "step_window": [0.16, 0.36], "cancel": 0.55, "swing_time": 0.25, "hitstop": 0.085,
-		"cut": "vertical", "next": "light_1", "power": 1.3,
+	_cache["light_3"] = {   # kaiten-zan: a low coil then a spinning slash all the way round (Onimusha flourish)
+		"name": "light_3", "duration": 0.86, "active": [0.2, 0.46], "damage": 26.0, "guard_damage": 24.0,
+		"step": 0.75, "step_window": [0.1, 0.34], "cancel": 0.6, "swing_time": 0.2, "hitstop": 0.085,
+		"cut": "horizontal", "next": "light_1", "power": 1.35, "spin": [0.16, 0.46, 330.0], "wide": true,
 		"keys": [g,
-			key(0.19, Vector3(0.03, 1.7, 0.03), Vector3(0.0, 0.35, 0.94), Vector3(0.0, 0.94, -0.35), 6.0, -9.0, 0.0, "out"),
-			key(0.31, Vector3(0.0, 1.3, -0.58), Vector3(0.0, 0.1, -1.0), Vector3(0.0, -1.0, 0.0), 0.0, 8.0, 0.06, "in"),
-			key(0.42, Vector3(0.0, 0.86, -0.5), Vector3(0.0, -0.75, -0.65), Vector3(0.0, -0.65, 0.75), 0.0, 20.0, 0.16, "out"),
-			key(0.76, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
+			key(0.12, Vector3(-0.36, 0.95, 0.15), Vector3(-0.8, -0.3, 0.5), Vector3(0.3, 0.0, -0.95), -50.0, -2.0, 0.17, "out"),
+			key(0.2, Vector3(0.46, 1.16, -0.12), Vector3(0.95, 0.05, -0.3), Vector3(0.0, -1.0, 0.0), 30.0, 4.0, 0.12, "in"),
+			key(0.33, Vector3(0.5, 1.17, -0.22), Vector3(0.92, 0.04, -0.4), Vector3(0.0, -1.0, 0.0), 10.0, 5.0, 0.1, "linear"),
+			key(0.46, Vector3(0.42, 1.16, -0.3), Vector3(0.85, 0.05, -0.52), Vector3(0.0, -1.0, 0.0), 0.0, 4.0, 0.09, "out"),
+			key(0.58, Vector3(0.12, 1.16, -0.52), Vector3(0.12, 0.12, -0.99), Vector3(-1.0, 0.0, 0.1), 0.0, 3.0, 0.08, "out"),
+			key(0.86, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["heavy_charge"] = {
 		"name": "heavy_charge", "duration": 0.3, "hold": true,
 		"keys": [g, key(0.3, Vector3(0.14, 1.62, 0.1), Vector3(0.28, 0.4, 0.87), Vector3(0.0, 0.9, -0.42), 18.0, -6.0, 0.08, "out")],
 	}
-	var charged := key(0.0, Vector3(0.14, 1.62, 0.1), Vector3(0.28, 0.4, 0.87), Vector3(0.0, 0.9, -0.42), 18.0, -6.0, 0.08)
-	_cache["heavy"] = {
-		"name": "heavy", "duration": 0.66, "active": [0.05, 0.22], "damage": 38.0, "guard_damage": 70.0,
-		"step": 1.3, "step_window": [0.0, 0.18], "cancel": 0.5, "swing_time": 0.04, "hitstop": 0.11,
-		"cut": "diagonal_down", "unblockable": false, "breaks_guard": true, "power": 1.8,
+	var charged := key(0.0, Vector3(0.14, 1.66, 0.12), Vector3(0.28, 0.4, 0.87), Vector3(0.0, 0.9, -0.42), 18.0, -8.0, 0.1)
+	_cache["heavy"] = {   # ichimonji: the sword crashes down from above the head, sticking in the ground
+		"name": "heavy", "duration": 0.78, "active": [0.07, 0.24], "damage": 38.0, "guard_damage": 70.0,
+		"step": 1.4, "step_window": [0.0, 0.2], "cancel": 0.58, "swing_time": 0.05, "hitstop": 0.13,
+		"cut": "diagonal_down", "unblockable": false, "breaks_guard": true, "power": 1.9, "slam": true,
 		"keys": [charged,
-			key(0.1, Vector3(0.0, 1.22, -0.62), Vector3(-0.35, 0.05, -0.93), Vector3(-0.6, -0.8, 0.0), -5.0, 10.0, 0.1, "in"),
-			key(0.22, Vector3(-0.36, 0.84, -0.26), Vector3(-0.6, -0.6, 0.5), Vector3(0.0, -0.6, 0.8), -42.0, 18.0, 0.16, "out"),
-			key(0.66, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
+			key(0.05, Vector3(0.02, 1.52, 0.02), Vector3(0.1, 0.9, 0.42), Vector3(0.0, 0.94, -0.35), 4.0, -10.0, 0.0, "linear"),
+			key(0.12, Vector3(0.0, 1.22, -0.62), Vector3(-0.2, 0.05, -0.97), Vector3(-0.6, -0.8, 0.0), -5.0, 10.0, 0.1, "in"),
+			key(0.22, Vector3(-0.2, 0.7, -0.44), Vector3(-0.3, -0.9, -0.35), Vector3(0.0, -0.6, 0.8), -22.0, 24.0, 0.2, "out"),
+			key(0.3, Vector3(-0.2, 0.58, -0.4), Vector3(-0.3, -0.94, -0.2), Vector3(0.0, -0.6, 0.8), -22.0, 26.0, 0.22, "out"),
+			key(0.5, Vector3(-0.2, 0.62, -0.4), Vector3(-0.3, -0.92, -0.22), Vector3(0.0, -0.6, 0.8), -18.0, 20.0, 0.18, "inout"),
+			key(0.78, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
-	_cache["counter"] = {
-		"name": "counter", "duration": 0.46, "active": [0.08, 0.22], "damage": 34.0, "guard_damage": 40.0,
-		"step": 0.8, "step_window": [0.0, 0.16], "cancel": 0.34, "swing_time": 0.06, "hitstop": 0.09,
-		"cut": "horizontal", "power": 1.6,
+	_cache["counter"] = {   # answer after a deflect: a fast rising diagonal
+		"name": "counter", "duration": 0.5, "active": [0.08, 0.23], "damage": 34.0, "guard_damage": 40.0,
+		"step": 0.85, "step_window": [0.0, 0.16], "cancel": 0.34, "swing_time": 0.06, "hitstop": 0.1,
+		"cut": "diagonal_up", "power": 1.65,
 		"keys": [g,
-			key(0.06, Vector3(0.36, 1.32, -0.12), Vector3(0.82, 0.24, 0.52), Vector3(0.2, -0.1, -0.97), 30.0, 0.0, 0.04, "out"),
-			key(0.14, Vector3(0.02, 1.22, -0.56), Vector3(-0.15, 0.05, -1.0), Vector3(-1.0, 0.0, 0.12), 0.0, 6.0, 0.06, "in"),
-			key(0.24, Vector3(-0.38, 1.1, -0.18), Vector3(-0.9, -0.12, 0.42), Vector3(0.25, 0.0, 1.0), -40.0, 8.0, 0.06, "out"),
-			key(0.46, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
+			key(0.05, Vector3(0.26, 0.86, -0.1), Vector3(0.6, -0.6, -0.5), Vector3(0.2, -0.1, -0.97), 26.0, 4.0, 0.12, "out"),
+			key(0.14, Vector3(0.05, 1.2, -0.56), Vector3(0.1, 0.35, -0.93), Vector3(-1.0, 0.0, 0.12), 0.0, 8.0, 0.08, "in"),
+			key(0.24, Vector3(-0.36, 1.5, -0.24), Vector3(-0.6, 0.7, -0.4), Vector3(0.25, 0.0, 1.0), -36.0, 5.0, 0.05, "out"),
+			key(0.34, Vector3(-0.4, 1.52, -0.18), Vector3(-0.65, 0.68, -0.3), Vector3(0.25, 0.0, 1.0), -40.0, 4.0, 0.04, "out"),
+			key(0.5, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	var hilt := hilt_pose()
 	_cache["iai"] = {

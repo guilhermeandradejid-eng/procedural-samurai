@@ -42,6 +42,7 @@ var dead := false
 var kinematic := false
 var gear := {}            # piece name -> MeshInstance3D
 var overrides := {}
+var face: Face
 var chunks: Array[RigidBody3D] = []   # far halves of sliced parts
 var _swing := []          # secondary motion state for hanging armour
 var _prev_vel := {}
@@ -130,6 +131,8 @@ func build(p_character: Node3D, style: String, scale := 1.0, seed := 0) -> void:
 		for mi in part_meshes[part]:
 			MaterialLibrary.apply(mi, overrides)
 	_build_joints(root_xf)
+	face = Face.new()
+	face.setup(self)
 
 
 func _make_shape(cs: CollisionShape3D, part: String, scale: float) -> void:

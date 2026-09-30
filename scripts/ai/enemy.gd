@@ -41,6 +41,7 @@ var _last_pos := Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
 var _ray := PhysicsRayQueryParameters3D.new()
 var standoff_mode := false
+var _perilous := false
 
 
 func _init() -> void:
@@ -289,10 +290,14 @@ func _plan_attack() -> void:
 	_pending_attack = name
 	_feint = _rng.randf() < 0.12
 	var tell := _rng.randf_range(0.18, 0.42)
-	if a.get("unblockable", false) or name == "enemy_heavy":
+	var perilous_roll := name == "thrust" and _rng.randf() < 0.3
+	if a.get("unblockable", false) or name == "enemy_heavy" or perilous_roll:
 		tell = 0.55
 		weapon.glint(Color(1.0, 0.12, 0.05), 1.0)
 		Audio.play_at("glint", weapon.tip(), 0.0, 0.05, 50.0)
+		Audio.play_at("peril", global_position + Vector3(0, 1.6, 0), 2.0, 0.0, 60.0)
+		FX.peril(global_position + Vector3(0, Rig.height() * scale_factor + 0.45, 0))
+		_perilous = true
 	_tell_left = tell
 	_combo_left = 1 if (_rng.randf() < 0.35 * aggression and name.begins_with("light")) else 0
 
@@ -300,9 +305,10 @@ func _plan_attack() -> void:
 func _do_attack(name: String) -> void:
 	if not start_attack(name):
 		return
-	if name == "enemy_heavy":
+	if name == "enemy_heavy" or _perilous:
 		attack = attack.duplicate()
 		attack.unblockable = true
+	_perilous = false
 	attack_cooldown = _rng.randf_range(1.2, 2.6) / aggression
 	if _combo_left > 0:
 		_combo_left -= 1
@@ -420,6 +426,7 @@ func die(info: Dictionary) -> void:
 	if player == null or not (info.get("attacker") is Player):
 		return
 	player.add_resolve_charge(0.34 if body.severed.is_empty() else 0.5)
+	FX.souls(chest_position(), 5 if style in ["ronin", "spearman"] else 9, player)
 	# kill cam: the last foe of a fight falls in slow motion
 	var last := true
 	if encounter:

@@ -194,7 +194,15 @@ static func make(name: String) -> Material:
 		"cord":
 			return _flat(Color(0.35, 0.08, 0.06), 0.8)
 		"eyes":
-			return _flat(Color(0.02, 0.02, 0.025), 0.15)
+			return _flat(Color(0.015, 0.015, 0.02), 0.08)
+		"eye_white":
+			return _flat(Color(0.97, 0.96, 0.93), 0.1)
+		"iris":
+			return _flat(Color(0.32, 0.17, 0.08), 0.12)
+		"eye_shine":
+			var sh := _flat(Color(1, 1, 1), 0.0)
+			sh.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			return sh
 		"hair":
 			return _flat(Color(0.04, 0.035, 0.03), 0.55)
 		"mask":

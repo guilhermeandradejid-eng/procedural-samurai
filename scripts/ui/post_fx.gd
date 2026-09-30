@@ -20,6 +20,7 @@ var lens_blood := 0.0
 var lens_tint := Color(0.5, 0.02, 0.02)
 var lens_rain := 0.0
 var flash_color := Color(1, 1, 1, 0)
+var _pulse_left := 0.0
 
 
 func _ready() -> void:
@@ -36,6 +37,7 @@ func _ready() -> void:
 		damage = clampf(damage + 0.35 + amount / 60.0, 0.0, 1.0)
 		aberration = maxf(aberration, 0.012))
 	Game.shake_requested.connect(func(t: float) -> void: aberration = maxf(aberration, t * 0.018))
+	Game.kurosawa_pulse.connect(func(d: float) -> void: _pulse_left = d)
 	Game.screen_flash.connect(func(c: Color, amount: float) -> void:
 		flash_color = Color(c.r, c.g, c.b, maxf(flash_color.a, amount)))
 	Game.lens_splash.connect(func(amount: float, color: Color) -> void:
@@ -72,7 +74,8 @@ func _process(delta: float) -> void:
 	focus = maxf(0.0, focus - real * 0.9)
 	if Engine.time_scale < 0.6:
 		focus = maxf(focus, (0.6 - Engine.time_scale) * 1.6)
-	kurosawa = move_toward(kurosawa, 1.0 if kurosawa_on else 0.0, real * 2.0)
+	_pulse_left = maxf(0.0, _pulse_left - real)
+	kurosawa = move_toward(kurosawa, 1.0 if (kurosawa_on or _pulse_left > 0.0) else 0.0, real * 6.0)
 	fade = move_toward(fade, fade_target, real * fade_speed)
 	letterbox = move_toward(letterbox, letterbox_target, real * 2.5)
 	var low := 0.0

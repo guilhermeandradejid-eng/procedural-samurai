@@ -51,6 +51,9 @@
    "sfx/death_grunt_3.ogg",
    "sfx/death_grunt_4.ogg"
   ],
+  "deathblow": [
+   "sfx/deathblow_0.ogg"
+  ],
   "dismember": [
    "sfx/dismember_0.ogg",
    "sfx/dismember_1.ogg",
@@ -81,6 +84,9 @@
    "sfx/huh_1.ogg",
    "sfx/huh_2.ogg"
   ],
+  "issen": [
+   "sfx/issen_0.ogg"
+  ],
   "jump": [
    "sfx/jump_0.ogg",
    "sfx/jump_1.ogg"
@@ -100,6 +106,9 @@
   "perfect": [
    "sfx/perfect_0.ogg"
   ],
+  "peril": [
+   "sfx/peril_0.ogg"
+  ],
   "pop": [
    "sfx/pop_0.ogg",
    "sfx/pop_1.ogg"
@@ -118,6 +127,11 @@
   ],
   "shrine_bell": [
    "sfx/shrine_bell_0.ogg"
+  ],
+  "soul": [
+   "sfx/soul_0.ogg",
+   "sfx/soul_1.ogg",
+   "sfx/soul_2.ogg"
   ],
   "squish": [
    "sfx/squish_0.ogg",

@@ -402,6 +402,52 @@ def pop(seed):
     return normalize(fade(y, 0.0005, 0.05), 0.7)
 
 
+def peril(seed):
+    """Warning of a perilous attack: a sharp two-tone sting over a low pulse."""
+    dur = 0.9
+    t = t_axis(dur)
+    y = sine(exp_glide(1480, 1330, dur), dur) * np.exp(-t / 0.35) * 0.55
+    y += sine(exp_glide(990, 880, dur), dur) * np.exp(-t / 0.4) * 0.4
+    y += saturate(sine(exp_glide(90, 55, dur), dur) * np.exp(-t / 0.25), 2.0) * 0.6
+    y += _strike(dur, seed, 2500, 12000, 0.006) * 0.7
+    y = reverb_mono(y, 0.25, 1.2, seed)[: int(1.2 * SR)]
+    return normalize(fade(y, 0.001, 0.2), 0.85)
+
+
+def issen(seed):
+    """Onimusha-style flash: rising shimmer, a heavy thud, and a cut."""
+    dur = 1.6
+    t = t_axis(dur)
+    rise = sweep_filter(white(dur, seed), exp_glide(300, 9000, dur * 0.25).tolist() + [9000.0] * (int(dur * SR) - int(dur * 0.25 * SR)), 5.0)
+    rise = np.asarray(rise) * env_points(dur, [(0, 0), (0.25, 1.0), (0.3, 0.0), (dur, 0.0)])
+    thud = sine(exp_glide(140, 38, dur), dur) * np.exp(-t / 0.3) * np.clip((t - 0.25) / 0.005, 0, 1)
+    cut = _strike(dur, seed + 1, 1500, 14000, 0.02) * np.clip((t - 0.25) / 0.002, 0, 1)
+    ring = modal(dur, [(1760, 0.6, 0.9), (2637, 0.4, 0.7), (3520, 0.25, 0.5)], seed) * np.clip((t - 0.28) / 0.003, 0, 1)
+    y = mix(rise * 0.5, thud * 1.1, cut * 0.9, ring * 0.35)
+    y = reverb_mono(y, 0.3, 2.0, seed)[: int(2.0 * SR)]
+    return normalize(fade(y, 0.001, 0.4), 0.95)
+
+
+def soul(seed):
+    dur = 0.6
+    t = t_axis(dur)
+    y = sine(exp_glide(700, 1500, dur), dur) * env_points(dur, [(0, 0), (0.05, 1.0), (dur, 0)])
+    y += sine(exp_glide(1400, 3000, dur), dur) * 0.3 * env_points(dur, [(0, 0), (0.05, 1.0), (dur, 0)])
+    return normalize(fade(y, 0.002, 0.15), 0.5)
+
+
+def deathblow(seed):
+    dur = 2.0
+    t = t_axis(dur)
+    thud = sine(exp_glide(120, 36, dur), dur) * np.exp(-t / 0.35)
+    slash = _strike(dur, seed, 800, 12000, 0.03)
+    gong = modal(dur, [(196, 1.0, 1.6), (392, 0.5, 1.2), (588, 0.3, 0.9), (833, 0.2, 0.6)], seed)
+    flesh = lowpass(white(dur, seed + 2), 900) * np.exp(-t / 0.2)
+    y = mix(thud * 1.2, slash * 0.9, gong * 0.45, flesh * 0.7)
+    y = reverb_mono(y, 0.3, 2.2, seed)[: int(2.4 * SR)]
+    return normalize(fade(y, 0.001, 0.4), 0.95)
+
+
 # name -> (generator, variations)
 SFX = {
     "swing": (swing, 5), "swing_heavy": (swing_heavy, 3), "clash": (clash, 4), "parry": (parry, 3),
@@ -412,5 +458,5 @@ SFX = {
     "perfect": (perfect, 1), "resolve": (resolve, 1), "heal": (heal, 1), "shrine_bell": (shrine_bell, 1),
     "banner": (banner, 1), "victory_sting": (victory_sting, 1), "ui_move": (ui_move, 1), "ui_select": (ui_select, 1),
     "map_open": (map_open, 1), "guiding_wind": (guiding_wind, 1), "blood_splat": (blood_splat, 3),
-    "thunder": (thunder, 2), "boing": (boing, 3), "squish": (squish, 3), "pop": (pop, 2),
+    "thunder": (thunder, 2), "peril": (peril, 1), "issen": (issen, 1), "soul": (soul, 3), "deathblow": (deathblow, 1), "boing": (boing, 3), "squish": (squish, 3), "pop": (pop, 2),
 }

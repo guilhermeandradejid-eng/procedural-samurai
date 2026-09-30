@@ -135,7 +135,11 @@ func _define() -> void:
 
 func _attack_times(a: String) -> Array:
 	var d: float = AttackLibrary.get_attack(a).get("duration", 0.6)
-	return [d * 0.15, d * 0.3, d * 0.45, d * 0.6, d * 0.85]
+	var n := int(OS.get_environment("STRIP_N")) if OS.get_environment("STRIP_N") != "" else 5
+	var out := []
+	for i in n:
+		out.append(d * (0.06 + 0.86 * float(i) / float(maxi(n - 1, 1))))
+	return out
 
 
 func _draw() -> void:
