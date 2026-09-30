@@ -660,6 +660,7 @@ func receive_hit(info: Dictionary) -> String:
 		info.deathblow = true
 		posture_broken = 0.0
 		Game.flash(Color(0.9, 0.05, 0.03), 0.5)
+		Game.impact_frame.emit(0.06)
 		Game.slowmo(1.2, 0.14)
 		Audio.play("deathblow", 0.0)
 		FX.blood_burst(point, dir, 3.4)

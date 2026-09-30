@@ -32,6 +32,7 @@ var _cut_total := 0.3
 var _cut_world := Vector3.ZERO
 var _cut_angle := 0.0
 var _speed := 0.0
+var _impact := 0.0
 
 
 func _ready() -> void:
@@ -71,6 +72,9 @@ func _ready() -> void:
 		var size := get_viewport().get_visible_rect().size
 		var v := Vector2((b.x - a.x) * size.x / size.y, b.y - a.y)
 		_cut_angle = atan2(v.y, v.x) if v.length() > 0.001 else 0.6)
+	Game.impact_frame.connect(func(d: float) -> void:
+		if float(Settings.get_value("combat_fx", 1.0)) > 0.05:
+			_impact = maxf(_impact, d))
 	kurosawa_on = bool(Settings.get_value("kurosawa", false))
 
 
@@ -120,6 +124,8 @@ func _process(delta: float) -> void:
 	lens_rain = lerpf(lens_rain, rain_target * 0.55, clampf(real * 0.5, 0.0, 1.0))
 	flash_color.a = maxf(0.0, flash_color.a - real * 4.5)
 	_update_juice(real)
+	_impact = maxf(0.0, _impact - real)
+	mat.set_shader_parameter("impact", 1.0 if _impact > 0.0 else 0.0)
 	mat.set_shader_parameter("flash_color", flash_color)
 	mat.set_shader_parameter("lens_blood", lens_blood)
 	mat.set_shader_parameter("lens_tint", Vector3(lens_tint.r, lens_tint.g, lens_tint.b))

@@ -26,6 +26,8 @@ signal combo_hit(power: float)
 ## Combat juice for the post-processing layer.
 signal radial_blur(strength: float, world_pos: Vector3, duration: float)
 signal slash_line(world_pos: Vector3, world_dir: Vector3, duration: float)
+## A single hard black, white and red frame (deathblows, the last kill of a fight); duration in real seconds.
+signal impact_frame(duration: float)
 
 
 func flash(color: Color, amount := 0.5) -> void:

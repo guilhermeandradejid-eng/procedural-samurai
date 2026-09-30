@@ -60,7 +60,8 @@ godot --path . -- --play   # pula a tela de título
   desmembramento e **fatiamento por plano** com shader de corte. Efeitos à la *Devil May Cry*: crescente
   de vento com refração, fita de ar atrás da lâmina, imagens residuais, desfoque radial, linhas de
   velocidade, o "corte" que racha a tela nos golpes fortes, brasas e luz na lâmina durante a carga do golpe
-  pesado (com anel e som ao chegar no máximo) e sangue na lente que escorre e some (opções: *Efeitos de
+  pesado (com anel e som ao chegar no máximo), sangue na lente que escorre e some e um quadro de impacto
+  em preto, branco e vermelho nos golpes mortais e na última morte de uma luta (opções: *Efeitos de
   combate* e *Desfoque de movimento*). As lâminas varrem um volume com espessura, então o golpe que
   encosta visualmente no alvo acerta.
 * **IA**: percepção por visão/ruído, alerta em grupo, fichas de ataque (poucos atacam por vez), fintas,

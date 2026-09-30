@@ -439,6 +439,7 @@ func die(info: Dictionary) -> void:
 	if last or info.get("attack", "") in ["iai", "assassinate"]:
 		Game.slowmo(1.5, 0.18)
 		Game.flash(Color(1.0, 0.85, 0.7), 0.3)
+		Game.impact_frame.emit(0.05)
 		Game.kill_cam_requested.emit(self, 1.4)
 
 

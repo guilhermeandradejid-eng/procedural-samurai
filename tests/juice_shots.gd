@@ -158,6 +158,17 @@ func _run() -> void:
 	if "charge" in attacks:
 		await _charge_shots()
 		attacks.remove_at(attacks.find("charge"))
+	if "impact" in attacks:
+		# the black, white and red frame of a deathblow, mid-swing
+		await _spawn()
+		player.combat_timer = 30.0
+		await _wait(0.4)
+		player.start_attack("heavy")
+		player.aim_attack_at(foe)
+		await _wait(0.2)
+		Game.impact_frame.emit(3.0)
+		await _shot("impact")
+		attacks.remove_at(attacks.find("impact"))
 	for name in attacks:
 		await _spawn()
 		for i in 25:

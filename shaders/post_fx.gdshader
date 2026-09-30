@@ -25,6 +25,7 @@ uniform float radial_blur = 0.0;
 uniform vec2 radial_center = vec2(0.5, 0.5);
 uniform float speed_lines = 0.0;
 uniform vec4 slash_line = vec4(0.5, 0.5, 0.0, 0.0);   // xy centre (uv), z angle, w strength
+uniform float impact = 0.0;   // 1 for the few frames of a black, white and red "impact frame"
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -141,6 +142,12 @@ void fragment() {
 		float flicker = 1.0 + (hash(vec2(floor(TIME * 24.0), 3.1)) - 0.5) * 0.06;
 		float scratch = step(0.9985, hash(vec2(floor(uv.x * 900.0), floor(TIME * 24.0)))) * 0.25;
 		col = mix(col, vec3(k * flicker + scratch), kurosawa);
+	}
+	// impact frame: one hard black, white and red drawing, like a manga panel (deathblows, last kills)
+	if (impact > 0.5) {
+		float ink = smoothstep(0.36, 0.5, dot(col, vec3(0.299, 0.587, 0.114)));
+		float red = clamp((col.r - max(col.g, col.b)) * 4.0, 0.0, 1.0);
+		col = mix(vec3(1.0 - ink), vec3(0.9, 0.03, 0.03), step(0.35, red));
 	}
 	// damage: blood-red pulse creeping in from the edges
 	float edge = smoothstep(0.08, 0.42, r2 * 1.8);
