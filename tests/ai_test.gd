@@ -4,6 +4,7 @@ extends Node3D
 ## player (blocks when an enemy winds up, strikes back otherwise).
 ## Headless:  godot --headless --path . res://tests/ai_test.tscn -- <out_dir>
 ## Rendered:  xvfb-run godot --path . res://tests/ai_test.tscn -- <out_dir> shots
+## env AI_TRACE=<frame> logs the blade tip against the nearest foe for every attack frame after it.
 
 var out_dir := "user://aitest"
 var shots_on := false
@@ -137,6 +138,18 @@ func _physics_process(delta: float) -> void:
 		Input.action_release("move_forward")
 	if frame > 150 and not player.dead:
 		_bot(delta)
+	if OS.get_environment("AI_TRACE") != "" and frame > int(OS.get_environment("AI_TRACE")) and player.action == "attack":
+		var near: Enemy = null
+		var nd2 := INF
+		for en4 in enc.alive():
+			var d4 := en4.global_position.distance_to(player.global_position)
+			if d4 < nd2:
+				nd2 = d4
+				near = en4
+		if near:
+			var pv := player.global_transform.affine_inverse()
+			_log("  atk %s t=%.2f sweep=%s tip=%s foe_chest=%s foe_act=%s d=%.2f step=%.2f tgt=%s" % [player.attack.get("name", "?"), player.action_time, player.weapon.sweeping,
+				_v(pv * player.weapon.tip()), _v(pv * near.chest_position()), near.action, nd2, player.attack_step, player.attack_target.name if player.attack_target else "-"])
 	if shots_on and frame in [40, 200, 320, 480, 640, 800]:
 		_shot()
 	if frame == 1400 or (enc.alive().is_empty() and frame > 200 and _states.get("done", "") == ""):
@@ -183,6 +196,10 @@ func _bot(delta: float) -> void:
 			player.cam_rig.yaw = atan2(-to.x, -to.z)
 		Input.action_press("move_forward")
 		get_tree().create_timer(0.1).timeout.connect(func() -> void: Input.action_release("move_forward"))
+
+
+func _v(v: Vector3) -> String:
+	return "(%.2f %.2f %.2f)" % [v.x, v.y, v.z]
 
 
 func _shot() -> void:

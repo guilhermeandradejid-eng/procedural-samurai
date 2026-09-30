@@ -2,6 +2,8 @@ extends Node3D
 ## Measures how reliably each move connects: an attacker swings at an idle
 ## dummy placed at several distances and angles; prints a hit matrix.
 ## godot --headless --path . res://tests/hit_test.tscn
+## env TRACE=player/light_1 TRACE_DIST=1.5 prints the blade path frame by frame;
+## env BLOCK=1 makes the dummy keep its guard up.
 
 const CASES := [
 	["player", "katana", ["light_1", "light_2", "light_3", "heavy", "counter"]],
@@ -94,6 +96,11 @@ func _physics_process(_delta: float) -> void:
 	if t is Enemy:
 		(t as Enemy).state = Enemy.State.IDLE
 		(t as Enemy).detection = 0.0
+	if OS.get_environment("BLOCK") != "" and _cur.frame > 5 and t.action != "block":
+		# the target keeps its guard up (a parry window has long passed)
+		t.set_action("block", 60.0)
+		t.block_time = 1.0
+		t.guard = t.max_guard
 	if _cur.frame == 20:
 		# let the enemy attacker see the dummy as its target
 		if a is Enemy:
@@ -110,6 +117,26 @@ func _physics_process(_delta: float) -> void:
 		var tgl: Vector3 = inv * tg.origin
 		var hand: Vector3 = inv * (a.body.parts["hand_r"] as Node3D).global_position
 		print("d=%.2f step=%.2f " % [Vector2(a.global_position.x - t.global_position.x, a.global_position.z - t.global_position.z).length(), a.attack_step], "t=%.2f sweep=%s grip=%s tip=%s hand=%s hand_tgt=%s str=%.2f" % [a.action_time, a.weapon.sweeping, _v(gripl), _v(tipl), _v(hand), _v(tgl), a.body.strength])
+		if OS.get_environment("TRACE_BLADE") != "":
+			var gw: Transform3D = a.animator.grip_world(Transform3D(a.global_basis.orthonormalized(), a.global_position))
+			var bd_anim: Vector3 = a.global_basis.inverse() * gw.basis.y
+			var bd_real: Vector3 = a.global_basis.inverse() * a.weapon.global_basis.y
+			print("   blade real %s anim %s hand_k %.2f" % [_v(bd_real), _v(bd_anim), a.body.strength * float(a.body.part_strength.get("hand_r", 1.0))])
+		if OS.get_environment("TRACE_ERR") != "":
+			var errs := []
+			for pn in ["pelvis", "belly", "chest", "upper_arm_r", "forearm_r", "hand_r", "upper_arm_l", "forearm_l", "hand_l"]:
+				var pt: Transform3D = a.body.targets[pn] * Transform3D(Basis(), a.body.com[pn])
+				var pc: Vector3 = (a.body.parts[pn] as Node3D).global_position
+				errs.append("%s %.3f" % [pn, (pt.origin - pc).length()])
+			print("   err ", ", ".join(errs))
+			var rel := []
+			for pair in [["upper_arm_r", "forearm_r"], ["forearm_r", "hand_r"], ["chest", "upper_arm_r"], ["upper_arm_l", "forearm_l"], ["forearm_l", "hand_l"], ["chest", "upper_arm_l"]]:
+				var bt: Basis = (a.body.targets[pair[0]] as Transform3D).basis.orthonormalized().inverse() * (a.body.targets[pair[1]] as Transform3D).basis.orthonormalized()
+				var bp: Basis = (a.body.parts[pair[0]] as Node3D).global_basis.orthonormalized().inverse() * (a.body.parts[pair[1]] as Node3D).global_basis.orthonormalized()
+				var qt := bt.get_rotation_quaternion()
+				var qp := bp.get_rotation_quaternion()
+				rel.append("%s>%s tgt %.0f° (x %.0f) phys %.0f° (x %.0f)" % [pair[0], pair[1], rad_to_deg(qt.get_angle()), rad_to_deg(bt.get_euler().x), rad_to_deg(qp.get_angle()), rad_to_deg(bp.get_euler().x)])
+			print("   rel ", " | ".join(rel))
 	if _cur.frame > 20 + 90 or (_cur.hit != "" and _cur.frame > 30):
 		var key := "%s/%s" % [_cur.q.style, _cur.q.move]
 		if not _results.has(key):

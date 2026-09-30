@@ -20,10 +20,10 @@ const MASK_DEAD := 1 | (1 << 3) | (1 << 4)
 const JOINTS := {
 	"belly": ["cone", 34.0, 28.0], "chest": ["cone", 34.0, 30.0], "head": ["cone", 55.0, 60.0],
 	"upper_arm_r": ["cone", 150.0, 85.0], "upper_arm_l": ["cone", 150.0, 85.0],
-	"forearm_r": ["hinge", -5.0, 150.0], "forearm_l": ["hinge", -5.0, 150.0],
-	"hand_r": ["cone", 45.0, 35.0], "hand_l": ["cone", 45.0, 35.0],
+	"forearm_r": ["hinge", -150.0, 5.0], "forearm_l": ["hinge", -150.0, 5.0],
+	"hand_r": ["cone", 110.0, 90.0], "hand_l": ["cone", 110.0, 90.0],
 	"thigh_r": ["cone", 125.0, 40.0], "thigh_l": ["cone", 125.0, 40.0],
-	"shin_r": ["hinge", -150.0, 5.0], "shin_l": ["hinge", -150.0, 5.0],
+	"shin_r": ["hinge", -5.0, 150.0], "shin_l": ["hinge", -5.0, 150.0],
 	"foot_r": ["cone", 48.0, 22.0], "foot_l": ["cone", 48.0, 22.0],
 }
 

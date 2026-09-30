@@ -52,6 +52,8 @@ var attack_target: Character = null
 var attack_step := 0.0
 var attack_step_window := Vector2.ZERO
 var _loco := Vector3.ZERO   # locomotion part of the horizontal velocity
+var _anim_acc := 0.0        # time owed to the animator while a far character skips frames
+var _anim_tick := 0
 var landed := 0.0
 var _was_on_floor := true
 var _fall_speed := 0.0
@@ -159,7 +161,16 @@ func _physics_process(delta: float) -> void:
 	_update_action(delta)
 	_update_stats(delta)
 	_move(delta)
-	animator.update(delta, anim_state())
+	if body.kinematic:
+		# far away characters animate at half rate: nobody can tell at that distance
+		_anim_acc += delta
+		_anim_tick += 1
+		if _anim_tick % 2 == 0:
+			animator.update(_anim_acc, anim_state())
+			_anim_acc = 0.0
+	else:
+		animator.update(delta, anim_state())
+		_anim_acc = 0.0
 	landed = 0.0
 	body.drive(delta)
 	if body.face and body.face.has_eyes():

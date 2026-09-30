@@ -686,7 +686,6 @@ func _solve_legs(delta: float, root: Transform3D, st: Dictionary, airborne: bool
 		var thigh_idx := 10 if f.side > 0 else 13
 		var shin_idx := thigh_idx + 1
 		var hip: Vector3 = _w[thigh_idx].origin
-		var knee_fk: Vector3 = _w[shin_idx].origin
 		# ankle target
 		var swing_a: Vector3 = fk_target[i]
 		# swinging feet follow the terrain when they are near the ground
@@ -714,12 +713,18 @@ func _solve_legs(delta: float, root: Transform3D, st: Dictionary, airborne: bool
 		var pin_ankle := pinned_pos + Vector3(0, ankle_h, 0)
 		var ankle := target.lerp(pin_ankle, f.lock_w)
 		f.ankle = ankle
-		# IK with the clip's knee as pole
-		var pole := knee_fk - hip
+		# IK that keeps the clip's own knee axis: the bend plane is the one the clip's thigh
+		# already bends in (its lateral axis, made perpendicular to the new hip-ankle line).
+		# A pole taken from the knee position flips when the leg is nearly straight (heel
+		# strike), and the twist of the thigh flips with it - more than the hip joint can follow.
 		var chord := (ankle - hip)
-		var perp := pole - chord.normalized() * pole.dot(chord.normalized())
-		if perp.length_squared() < 1e-5:
-			pole = -root.basis.z + root.basis.x * 0.2 * f.side
+		var chord_dir := chord.normalized() if chord.length_squared() > 1e-8 else Vector3.DOWN
+		var axis_fk: Vector3 = (_w[thigh_idx] as Transform3D).basis.x
+		var axis := axis_fk - chord_dir * axis_fk.dot(chord_dir)
+		if axis.length_squared() < 1e-4:
+			axis = root.basis.x
+			axis = axis - chord_dir * axis.dot(chord_dir)
+		var pole := axis.normalized().cross(chord_dir)
 		var l1 := Rig.bone_length("thigh" + sfx) * s
 		var l2 := Rig.bone_length("shin" + sfx) * s
 		var r := solve_ik(hip, ankle, l1, l2, pole)
