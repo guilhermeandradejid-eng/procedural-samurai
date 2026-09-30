@@ -10,8 +10,8 @@ extends RefCounted
 const WEAPONS := {
 	"katana": {"left_hand": -0.11, "reach": 1.0, "ideal": 1.05, "blade_start": 0.05, "blade_end": 0.75, "guard": "guard_katana", "two_handed": true, "mass": 1.2},
 	"nodachi": {"left_hand": -0.26, "reach": 1.4, "ideal": 1.35, "blade_start": 0.05, "blade_end": 1.12, "guard": "guard_katana", "two_handed": true, "mass": 2.4},
-	"kanabo": {"left_hand": -0.2, "reach": 1.2, "ideal": 1.2, "blade_start": 0.2, "blade_end": 0.95, "guard": "guard_kanabo", "two_handed": true, "mass": 4.0},
-	"yari": {"left_hand": 0.55, "reach": 2.2, "ideal": 1.9, "blade_start": 1.25, "blade_end": 1.64, "guard": "guard_yari", "two_handed": true, "mass": 2.0},
+	"kanabo": {"left_hand": -0.12, "reach": 1.2, "ideal": 1.2, "blade_start": 0.2, "blade_end": 0.95, "guard": "guard_kanabo", "two_handed": true, "mass": 4.0},
+	"yari": {"left_hand": 0.2, "reach": 2.2, "ideal": 1.9, "blade_start": 1.25, "blade_end": 1.64, "guard": "guard_yari", "two_handed": true, "mass": 2.0},
 }
 
 ## Hip of the chibi body (torso is 1.32x wider than the human reference the
@@ -40,9 +40,9 @@ static func key(t: float, pos: Vector3, dir: Vector3, edge: Vector3, twist := 0.
 static func guard(weapon: String) -> Dictionary:
 	match weapon:
 		"kanabo":
-			return key(0.0, Vector3(0.2, 1.1, -0.18), Vector3(0.1, 0.9, 0.25), Vector3(0, 0, -1))
+			return key(0.0, Vector3(0.04, 1.37, -0.18), Vector3(0.1, 0.92, 0.3), Vector3(0, 0, -1))
 		"yari":
-			return key(0.0, Vector3(0.14, 1.02, 0.12), Vector3(-0.05, 0.28, -0.96), Vector3(0, 1, 0))
+			return key(0.0, Vector3(0.05, 1.17, -0.02), Vector3(-0.05, 0.25, -0.96), Vector3(0, 1, 0))
 		_:
 			return key(0.0, Vector3(0.02, 1.2727, -0.24), Vector3(0.0, 0.5, -0.86), Vector3(0.0, -0.86, -0.5))
 
@@ -193,7 +193,7 @@ static func _build() -> void:
 	# ------------------------------------------------------------ kanabo
 	var kg := guard("kanabo")
 	_cache["smash"] = {
-		"name": "smash", "duration": 1.35, "active": [0.66, 0.84], "damage": 32.0, "guard_damage": 60.0,
+		"name": "smash", "clip": "kanabo_smash", "duration": 1.35, "active": [0.66, 0.84], "damage": 32.0, "guard_damage": 60.0,
 		"step": 0.8, "step_window": [0.55, 0.8], "cancel": 1.2, "swing_time": 0.62, "hitstop": 0.12,
 		"cut": "crush", "breaks_guard": true, "unblockable": true, "power": 2.2,
 		"keys": [kg,
@@ -204,7 +204,7 @@ static func _build() -> void:
 			key(1.35, kg.pos, kg.dir, kg.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["sweep"] = {
-		"name": "sweep", "duration": 1.1, "active": [0.48, 0.66], "damage": 24.0, "guard_damage": 40.0,
+		"name": "sweep", "clip": "kanabo_sweep", "duration": 1.1, "active": [0.48, 0.66], "damage": 24.0, "guard_damage": 40.0,
 		"step": 0.5, "step_window": [0.4, 0.6], "cancel": 0.95, "swing_time": 0.45, "hitstop": 0.1,
 		"cut": "crush", "power": 1.8,
 		"keys": [kg,
@@ -216,7 +216,7 @@ static func _build() -> void:
 	# -------------------------------------------------------------- yari
 	var yg := guard("yari")
 	_cache["thrust"] = {
-		"name": "thrust", "duration": 0.8, "active": [0.34, 0.5], "damage": 20.0, "guard_damage": 18.0,
+		"name": "thrust", "clip": "yari_thrust", "duration": 0.8, "active": [0.34, 0.5], "damage": 20.0, "guard_damage": 18.0,
 		"step": 0.7, "step_window": [0.3, 0.48], "cancel": 0.62, "swing_time": 0.3, "hitstop": 0.07,
 		"cut": "thrust", "power": 1.2,
 		"keys": [yg,
@@ -225,7 +225,7 @@ static func _build() -> void:
 			key(0.8, yg.pos, yg.dir, yg.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["spear_sweep"] = {
-		"name": "spear_sweep", "duration": 1.0, "active": [0.42, 0.6], "damage": 18.0, "guard_damage": 20.0, "ideal": 1.45,
+		"name": "spear_sweep", "clip": "yari_sweep", "duration": 1.0, "active": [0.42, 0.6], "damage": 18.0, "guard_damage": 20.0, "ideal": 1.45,
 		"step": 0.3, "step_window": [0.4, 0.55], "cancel": 0.85, "swing_time": 0.4, "hitstop": 0.07,
 		"cut": "crush", "power": 1.3,
 		"keys": [yg,

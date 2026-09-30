@@ -134,6 +134,7 @@ func anim_state() -> Dictionary:
 		"weapon_in_hand": weapon != null and weapon.in_hand and not disarmed,
 		"action": action,
 		"action_time": action_time,
+		"action_duration": action_duration,
 		"attack": attack,
 		"combat": combat,
 		"crouching": crouching,
@@ -205,7 +206,9 @@ func _move(delta: float) -> void:
 		desired *= 0.15
 		var sw := attack_step_window
 		if action_time >= sw.x and action_time <= sw.y and sw.y > sw.x:
-			var step_speed: float = attack_step / (sw.y - sw.x)
+			# the lunge eases in and out (same total distance as a constant-speed step)
+			var lu := clampf((action_time - sw.x) / (sw.y - sw.x), 0.0, 1.0)
+			var step_speed: float = attack_step * 6.0 * lu * (1.0 - lu) / (sw.y - sw.x)
 			var fwd := -global_basis.z
 			if attack_target and is_instance_valid(attack_target) and not attack_target.dead:
 				var to := attack_target.global_position - global_position

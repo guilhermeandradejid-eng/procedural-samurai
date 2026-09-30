@@ -88,7 +88,7 @@ def build_roll():
 
 
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["locomotion", "roll", "poses", "katana"]
+    which = sys.argv[1:] or ["locomotion", "roll", "poses", "katana", "polearms"]
     if "locomotion" in which:
         build_locomotion()
     if "roll" in which:
@@ -99,3 +99,6 @@ if __name__ == "__main__":
     if "katana" in which:
         import clips_katana
         clips_katana.build(OUT)
+    if "polearms" in which:
+        import clips_polearms
+        clips_polearms.build(OUT)

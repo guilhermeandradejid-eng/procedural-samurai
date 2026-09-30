@@ -8,7 +8,7 @@ código (Python + Blender como módulo `bpy`), sem nenhum asset externo.
 
 > Combate cheio de *game juice*: golpes com câmera lenta, aparos perfeitos, fatiamento de verdade
 > (o corte segue o plano da lâmina e mostra o interior), desmembramento, sangue por todo lado, cabeças que
-> quicam com um sonoro **BOING!**, onomatopeias em quadrinhos e muito exagero.
+> quicam com um sonoro **BOING!** e muito exagero — sem textos na tela atrapalhando a cena.
 
 ## Como jogar
 
@@ -47,14 +47,18 @@ godot --path . -- --play   # pula a tela de título
   amostras, altocúmulos, cirros), Via Láctea, estrelas cadentes, aurora, lua com crateras; névoa volumétrica
   rente ao solo, chuva com respingos, poças com ondulações, relâmpagos que iluminam nuvens e neblina;
   grama que pende molhada, personagens ensopados e gotas na lente da câmera.
-* **Personagens**: ragdoll ativo (corpo físico que persegue animações procedurais: marcha, IK de pés e
-  braços, golpes por keyframes de espada), armaduras/kabuto/kasa/katana modelados em Blender.
+* **Personagens**: ragdoll ativo (corpo físico que persegue poses-alvo) tocando **clipes de animação
+  esquelética** (captura de movimento real para andar/correr/rolar, poses-chave autorais para golpes e
+  reações) com stride warping, orientation warping, inertialization, pés presos ao terreno por IK e
+  empunhadura de duas mãos; armaduras/kabuto/kasa/katana modelados em Blender. Veja `docs/animacao.md`
+  (inclui o pipeline para gerar golpes por texto com AnimationGPT).
 * **Combate**: combos, carga, bloqueio/aparo, rolamento com i-frames, ímã de golpe, atordoamento,
   vento/desmembramento e **fatiamento por plano** com shader de corte.
 * **IA**: percepção por visão/ruído, alerta em grupo, fichas de ataque (poucos atacam por vez), fintas,
   golpes telegrafados (brilho vermelho = imbloqueável), fuga, patrulhas.
 * **Áudio 100 % sintetizado**: espadas, carne, vozes, sinos, taiko + shakuhachi + koto, ambientes.
-* **Interface**: HUD com pincelada, indicadores de detecção, mapa de pergaminho, pausa, opções, morte.
+* **Interface**: HUD com pincelada, indicadores de detecção (o golpe imbloqueável ganha um triângulo de
+  alerta vermelho em vez de texto), mapa de pergaminho, pausa, opções, morte.
 
 ## Gerando os assets (já estão versionados)
 
@@ -65,6 +69,7 @@ python3 tools/worldgen/scatter.py            # árvores e rochas
 python3 tools/textures/generate_textures.py  # texturas procedurais
 python3 tools/blender/build_models.py        # modelos 3D (Blender como módulo)
 python3 tools/audio/synth_all.py             # sons e músicas
+python3 tools/motion/build_all.py            # clipes de animação (assets/motion)
 python3 tools/project/make_project.py        # project.godot
 godot --headless --path . --import
 python3 tools/project/fix_imports.py         # texture arrays, loops de áudio
@@ -79,7 +84,9 @@ godot --headless --path . res://tests/ai_test.tscn                  # IA em comb
 godot --headless --path . -- --play --autotest <dir>                # bot joga no mundo real
 xvfb-run godot --path . --rendering-driver vulkan res://tests/pose_gallery.tscn -- <dir>
 python3 tests/make_sheet.py <dir> <prefixo>                          # folha de poses
-godot --path . -- --tour <dir> --weather storm --time 17.5          # capturas do mundo
+godot --path . -- --tour <dir> --weather storm --time 17.5          # capturas do mundo (views: sun, moon, ...)
+python3 tools/motion/check_clips.py                                  # sanidade dos clipes de animação
+python3 tools/motion/text2motion/selftest.py                         # importador de texto→movimento
 ```
 
 Variáveis do `--autotest`: `AUTOTEST_MODE=standoff|assassinate`, `AUTOTEST_FRAMES`, `AUTOTEST_APPROACH`.

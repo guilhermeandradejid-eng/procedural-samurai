@@ -82,6 +82,7 @@ class Clip:
         self.meta = {}
         self.grip_space = "chest"   # "chest": g_* are relative to the chest pivot; "root": character space
         self.edge_auto = False      # chest-space clips: edge follows the tip's world travel
+        self.left_off = None        # left hand offset along the hilt (None: the katana default)
         self.auto = None            # callable(ch, clip) that derives body channels from the sampled sword path
 
     def key(self, t, **kw):
@@ -141,7 +142,61 @@ def _rot_apply(r, v):
     return r.apply(v)
 
 
-def solve(ch, T=None, grip_space="chest", edge_auto=False, fps=FPS):
+
+def edge_from_path(wpos, wblade, fps, edge0, blade_len=0.9, max_roll_rate=14.0, speed_min=0.6):
+    """Edge direction of a swung blade (world/character space). The edge is carried along
+    with the blade by parallel transport (no spurious twist) and rolls towards the
+    direction the tip is travelling (the cutting edge leads) at a limited rate; when the
+    tip reverses or stalls the roll is simply kept."""
+    from scipy.ndimage import gaussian_filter1d
+    T = len(wpos)
+    tip = wpos + wblade * blade_len
+    v = gaussian_filter1d(np.gradient(tip, axis=0) * fps, 1.2, axis=0, mode="nearest")
+    edge = np.zeros((T, 3))
+    e = edge0 - wblade[0] * np.dot(edge0, wblade[0])
+    e /= max(np.linalg.norm(e), 1e-6)
+    edge[0] = e
+    dt = 1.0 / fps
+    for t in range(1, T):
+        b0, b1 = wblade[t - 1], wblade[t]
+        # parallel transport of the edge with the blade
+        ax = np.cross(b0, b1)
+        an = np.linalg.norm(ax)
+        if an > 1e-6:
+            ang = np.arctan2(an, np.dot(b0, b1))
+            e = R.from_rotvec(ax / an * ang).apply(e)
+        e = e - b1 * np.dot(e, b1)
+        e /= max(np.linalg.norm(e), 1e-6)
+        vp = v[t] - b1 * np.dot(v[t], b1)
+        sp = np.linalg.norm(vp)
+        if sp > speed_min:
+            d = vp / sp
+            if np.dot(d, e) > -0.2:
+                # signed roll angle from e to d about the blade axis
+                ang = np.arctan2(np.dot(np.cross(e, d), b1), np.dot(e, d))
+                step = np.clip(ang, -max_roll_rate * dt, max_roll_rate * dt)
+                e = R.from_rotvec(b1 * step).apply(e)
+        edge[t] = e
+    return normalize(gaussian_filter1d(edge, 1.0, axis=0, mode="nearest"))
+
+
+def blend_rot(A_, B_, k):
+    """A * exp(k * log(A^-1 B)) with the log unwrapped over time, so blending two
+    orientations that are nearly opposite does not jump between the two arcs."""
+    rel = A_.inv() * B_
+    rv = rel.as_rotvec()
+    out = rv.copy()
+    for t in range(1, len(rv)):
+        ang = np.linalg.norm(rv[t])
+        if ang < 1e-6:
+            continue
+        alt = rv[t] / ang * (ang - 2 * np.pi)
+        if np.linalg.norm(alt - out[t - 1]) < np.linalg.norm(rv[t] - out[t - 1]):
+            out[t] = alt
+    return A_ * R.from_rotvec(out * np.asarray(k)[:, None])
+
+
+def solve(ch, T=None, grip_space="chest", edge_auto=False, fps=FPS, left_off=None):
     """channel arrays -> dict(pelvis_pos, rot(T,16,4), grip(T,12), contacts(T,2), chest_w...)"""
     r = rig()
     T = len(ch["px"])
@@ -204,23 +259,9 @@ def solve(ch, T=None, grip_space="chest", edge_auto=False, fps=FPS):
     edge = np.stack([ch["g_ex"], ch["g_ey"], ch["g_ez"]], axis=1)
     edge = normalize(edge - blade * np.sum(edge * blade, axis=1, keepdims=True))
     if edge_auto and grip_space == "chest":
-        # the cutting edge leads: derive it from the world-space travel of the blade tip
-        from scipy.ndimage import gaussian_filter1d
         wpos = chest_pos + chest_rot.apply(grip_pos)
         wblade = chest_rot.apply(blade)
-        tip = wpos + wblade * 0.9
-        v = gaussian_filter1d(np.gradient(tip, axis=0) * fps, 1.2, axis=0, mode="nearest")
-        vp = v - wblade * np.sum(v * wblade, axis=1, keepdims=True)
-        sp = np.linalg.norm(vp, axis=1)
-        wedge = np.zeros_like(vp)
-        last = chest_rot[0].apply(edge[0])
-        for t_ in range(len(sp)):
-            if sp[t_] > 0.6:
-                last = vp[t_] / sp[t_]
-            e_ = last - wblade[t_] * np.dot(last, wblade[t_])
-            n_ = np.linalg.norm(e_)
-            wedge[t_] = e_ / n_ if n_ > 1e-4 else np.array([0.0, -1.0, 0.0])
-        wedge = normalize(gaussian_filter1d(wedge, 1.8, axis=0, mode="nearest"))
+        wedge = edge_from_path(wpos, wblade, fps, chest_rot[0].apply(edge[0]))
         edge = normalize(chest_rot.inv().apply(wedge))
     # grip basis (AttackLibrary.grip_basis)
     gy = blade
@@ -264,7 +305,7 @@ def solve(ch, T=None, grip_space="chest", edge_auto=False, fps=FPS):
             # hand target = weapon grip (the left hand sits lower on the hilt)
             gp = grip_pos_w.copy()
             if side < 0:
-                gp = gp + grip_rot_w.apply(np.array([0.0, LEFT_HAND_OFF, 0.0]))
+                gp = gp + grip_rot_w.apply(np.array([0.0, LEFT_HAND_OFF if left_off is None else left_off, 0.0]))
             hand_rot = grip_rot_w * inv_rot
             hand_pos = gp + grip_rot_w.apply(inv_pos)
             wgt = ch["g_w"] * (ch["g_left"] if side < 0 else 1.0)
@@ -285,12 +326,10 @@ def solve(ch, T=None, grip_space="chest", edge_auto=False, fps=FPS):
             sel = k > 0.02
             fk_q = ua_w.as_quat()
             ik_q = ik_ua.as_quat()
-            ua_w = R.from_quat(mo_rig.quat_slerp(fk_q, ik_q, np.where(sel, k, 0.0)))
-            fk_q = fa_w.as_quat()
-            ik_q = ik_fa.as_quat()
-            fa_w = R.from_quat(mo_rig.quat_slerp(fk_q, ik_q, np.where(sel, k, 0.0)))
-            hand_w_ik = hand_rot
-            hd_w = R.from_quat(mo_rig.quat_slerp(hd_w.as_quat(), hand_w_ik.as_quat(), np.where(sel, k, 0.0)))
+            kk = np.where(sel, k, 0.0)
+            ua_w = blend_rot(ua_w, ik_ua, kk)
+            fa_w = blend_rot(fa_w, ik_fa, kk)
+            hd_w = blend_rot(hd_w, hand_rot, kk)
         rot_w[ua] = ua_w
         loc[ua] = chest_rot.inv() * ua_w
         rot_w[fa] = fa_w
@@ -323,7 +362,7 @@ def bake_clip(c: Clip, out_dir=None, speed=0.0):
     ch = c.sample()
     if c.auto is not None:
         c.auto(ch, c)
-    res = solve(ch, grip_space=c.grip_space, edge_auto=c.edge_auto, fps=c.fps)
+    res = solve(ch, grip_space=c.grip_space, edge_auto=c.edge_auto, fps=c.fps, left_off=c.left_off)
     has_grip = np.any(ch["g_w"] > 0.02)
     path = clipio.save(c.name, c.fps, c.loop, res["pelvis_pos"], res["rot"], res["contacts"],
                        grip=res["grip"] if has_grip else None, speed=speed, events=c.events, meta=c.meta, out_dir=out_dir)
@@ -426,29 +465,10 @@ def reach_solver(ch, clip, max_reach=0.92, yaw_range=(-55, 55), lean_range=(-8, 
     return by, bl
 
 
-def auto_edge(ch, clip, blade_len=0.9, sigma=1.2, smooth_vel=True):
-    """Edge direction of the blade follows the way the tip travels (the cutting edge
-    leads), computed from the sampled character-space grip path."""
-    from scipy.ndimage import gaussian_filter1d
-    T = len(ch["px"])
+def auto_edge(ch, clip, blade_len=0.9, **_):
+    """Edge follows the blade tip travel (character-space grip path)."""
     pos = np.stack([ch["g_x"], ch["g_y"], ch["g_z"]], axis=1)
     blade = normalize(np.stack([ch["g_bx"], ch["g_by"], ch["g_bz"]], axis=1))
-    tip = pos + blade * blade_len
-    v = np.gradient(tip, axis=0) * clip.fps
-    if smooth_vel:
-        v = gaussian_filter1d(v, sigma, axis=0, mode="nearest")
-    vp = v - blade * np.sum(v * blade, axis=1, keepdims=True)
-    sp = np.linalg.norm(vp, axis=1)
-    edge = np.zeros((T, 3))
-    last = np.array([0.0, -0.8, -0.6])
-    for t in range(T):
-        if sp[t] > 0.6:
-            last = vp[t] / sp[t]
-        # keep the edge perpendicular to the blade
-        e = last - blade[t] * np.dot(last, blade[t])
-        n = np.linalg.norm(e)
-        edge[t] = e / n if n > 1e-4 else np.array([0.0, -1.0, 0.0])
-    # slow movements: blend towards a smoothed version to avoid twitching
-    edge = gaussian_filter1d(edge, sigma * 1.5, axis=0, mode="nearest")
-    edge = normalize(edge)
+    e0 = np.array([ch["g_ex"][0], ch["g_ey"][0], ch["g_ez"][0]])
+    edge = edge_from_path(pos, blade, clip.fps, e0, blade_len)
     ch["g_ex"], ch["g_ey"], ch["g_ez"] = edge[:, 0], edge[:, 1], edge[:, 2]

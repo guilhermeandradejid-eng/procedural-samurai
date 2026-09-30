@@ -131,9 +131,11 @@ def limb_basis(bone_dir, hinge):
     return rot_from_basis(x, y, z)
 
 
-def solve_ik(root, target, l1, l2, pole):
+def solve_ik(root, target, l1, l2, pole, continuity=True):
     """Two-bone IK identical to ProceduralAnimator.solve_ik.
-    All (T,3). Returns mid, end, hinge (bend plane normal)."""
+    All (T,3). Returns mid, end, hinge (bend plane normal). With `continuity` the bend
+    direction of frame t follows frame t-1 whenever the limb is nearly straight along
+    the pole (the elbow would otherwise flip to the other side)."""
     to_t = target - root
     dist = np.linalg.norm(to_t, axis=-1)
     lo = max(abs(l1 - l2) + 0.001, 0.02)
@@ -146,6 +148,15 @@ def solve_ik(root, target, l1, l2, pole):
     alt = np.array([0, 0, -1.0]) - dirv * np.sum(np.array([0, 0, -1.0]) * dirv, axis=-1, keepdims=True)
     bend = np.where(bl < 1e-3, alt, bend)
     bend = normalize(bend)
+    if continuity and bend.ndim == 2 and bend.shape[0] > 1:
+        for t in range(1, bend.shape[0]):
+            weak = bl[t, 0] < 0.25 * np.linalg.norm(pole[t] if pole.ndim == 2 else pole)
+            flip = np.dot(bend[t], bend[t - 1]) < 0.2
+            if weak or flip:
+                b = bend[t - 1] - dirv[t] * np.dot(bend[t - 1], dirv[t])
+                n = np.linalg.norm(b)
+                if n > 1e-4:
+                    bend[t] = b / n
     mid = root + (dirv * np.cos(a)[..., None] + bend * np.sin(a)[..., None]) * l1
     end = root + dirv * dist_c[..., None]
     hinge = normalize(np.cross(bend, dirv))

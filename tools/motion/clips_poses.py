@@ -180,15 +180,15 @@ def parry():
 
 
 def draw():
-    c = A.Clip("draw", 0.46, loop=False)
+    c = A.Clip("draw", 0.5, loop=False)
     c.grip_space = "root"
     c.auto = pipeline()
     base = dict(STANCE, p_lean=3)
     KH(c, 0.0, left=0.0, crouch=0.04, lean=6, **base)
-    K(c, 0.08, (0.0, 0.95, -0.15), (0.5, 0.4, 0.75), left=0.0, crouch=0.05, lean=6, **base)
-    K(c, 0.16, (0.15, 1.15, -0.28), (0.4, 0.6, -0.4), left=0.4, crouch=0.04, lean=5, **base)
-    K(c, 0.3, (0.06, 1.15, -0.28), (0.1, 0.55, -0.83), left=1.0, crouch=0.03, lean=4, **base)
-    KG(c, 0.46, crouch=0.03, lean=4, **base)
+    K(c, 0.10, (0.0, 0.95, -0.15), (0.5, 0.4, 0.75), left=0.0, crouch=0.05, lean=6, **base)
+    K(c, 0.21, (0.15, 1.15, -0.28), (0.4, 0.6, -0.4), left=0.4, crouch=0.04, lean=5, **base)
+    K(c, 0.34, (0.06, 1.15, -0.28), (0.1, 0.55, -0.83), left=1.0, crouch=0.03, lean=4, **base)
+    KG(c, 0.5, crouch=0.03, lean=4, **base)
     return c
 
 

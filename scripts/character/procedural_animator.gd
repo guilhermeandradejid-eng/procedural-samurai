@@ -282,6 +282,17 @@ func _select(st: Dictionary, root: Transform3D, hvel: Vector3) -> Dictionary:
 			var c := MotionClip.get_clip(cname)
 			if c != null and dur > 0.0:
 				t = at * c.duration / dur
+				# line the clip's strike up with the middle of the gameplay sweep window, whatever
+				# the clip's own length or timing (generated clips are rarely on the beat)
+				var act: Array = att.get("active", [])
+				if c.meta.has("strike") and act.size() == 2:
+					var sg := lerpf(float(act[0]), float(act[1]), 0.45)
+					var sc := float(c.meta.strike) * c.duration / maxf(c.duration, 0.01)
+					if sg > 0.02 and sg < dur - 0.02:
+						if at < sg:
+							t = at / sg * sc
+						else:
+							t = sc + (at - sg) / (dur - sg) * (c.duration - sc)
 			res.half = 0.05
 		"block":
 			cname = "block"
@@ -504,7 +515,7 @@ func _choose_grip(delta: float, root: Transform3D, st: Dictionary, sel: Dictiona
 			target_w = 0.35
 			key = AttackLibrary.guard(weapon)
 		elif st.get("run_blade_back", false):
-			key = AttackLibrary.key(0, Vector3(0.3, 0.92, 0.12), Vector3(0.25, -0.35, 0.9), Vector3(0, -1, 0))
+			key = AttackLibrary.key(0, Vector3(0.3, 1.06, 0.08), Vector3(0.25, -0.35, 0.9), Vector3(0, -1, 0))
 			left_t = 0.0
 		elif action == "attack":
 			# attack without a clip: legacy key frames hold the grip in character space
