@@ -13,6 +13,7 @@ var poses := {}
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:
 		out_dir = args[0]
@@ -188,6 +189,9 @@ func _run() -> void:
 			while t0 < float(tt):
 				await get_tree().physics_frame
 				t0 += 1.0 / Engine.physics_ticks_per_second
+			# freeze the simulation while the frames are captured (rendering is slow
+			# and physics would otherwise run on between the shots)
+			get_tree().paused = true
 			# two cameras: 3/4 front-right and side
 			for v in 2:
 				var c := ch.global_position
@@ -202,6 +206,7 @@ func _run() -> void:
 				await RenderingServer.frame_post_draw
 				var img := get_viewport().get_texture().get_image()
 				img.save_png("%s/%s_%d_%d.png" % [out_dir, name, view, v])
+			get_tree().paused = false
 			view += 1
 	print("pose gallery done")
 	get_tree().quit()
