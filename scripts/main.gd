@@ -12,6 +12,7 @@ var player: Player
 var _discover_timer := 0.0
 var _region := ""
 var _tour := false
+var _standoff: Standoff = null
 
 
 func _ready() -> void:
@@ -136,13 +137,35 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not Game.is_playing() or player == null or player.dead:
 		return
+	if not player.input_enabled:
+		return
 	if event.is_action_pressed("interact"):
+		var target := ui.hud.current_assassination()
+		if target:
+			player.assassinate(target)
+			get_viewport().set_input_as_handled()
+			return
 		var it := ui.hud.current_interactable()
 		if it:
 			it.interact(player)
 			get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("guiding_wind"):
 		_guiding_wind()
+	elif event.is_action_pressed("standoff"):
+		_try_standoff()
+
+
+func _try_standoff() -> void:
+	if _standoff and is_instance_valid(_standoff):
+		return
+	var cands := player.standoff_candidates()
+	if cands.is_empty():
+		Game.show_toast("Não há inimigos para desafiar")
+		return
+	_standoff = Standoff.new()
+	_standoff.name = "Standoff"
+	add_child(_standoff)
+	_standoff.start(player, cands, ui)
 
 
 func _check_discovery() -> void:

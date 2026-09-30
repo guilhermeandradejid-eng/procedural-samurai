@@ -83,6 +83,8 @@ func _think(delta: float) -> void:
 	var player := Game.get_player()
 	if player == null or not is_instance_valid(player):
 		return
+	if standoff_mode:
+		return   # driven by the Standoff director
 	_think_timer -= delta
 	if _think_timer <= 0.0:
 		_think_timer = 0.2 + _rng.randf() * 0.1
@@ -107,7 +109,7 @@ func _perceive(player: Player, dt: float) -> void:
 			state = State.IDLE
 			aware = false
 		return
-	var to := player.chest_position() - (global_position + Vector3(0, 1.6 * scale_factor, 0))
+	var to := player.chest_position() - (global_position + Vector3(0, Rig.height() * 0.85 * scale_factor, 0))
 	var d := to.length()
 	var seen := 0.0
 	var tod: TimeOfDay = Game.world.time_of_day if Game.world else null
@@ -150,7 +152,7 @@ func _perceive(player: Player, dt: float) -> void:
 
 func _line_of_sight(player: Player) -> bool:
 	var space := get_world_3d().direct_space_state
-	_ray.from = global_position + Vector3(0, 1.62 * scale_factor, 0)
+	_ray.from = global_position + Vector3(0, Rig.height() * 0.86 * scale_factor, 0)
 	_ray.to = player.chest_position()
 	_ray.exclude = _exclude
 	var hit := space.intersect_ray(_ray)

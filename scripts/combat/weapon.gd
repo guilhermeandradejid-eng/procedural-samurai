@@ -51,7 +51,7 @@ func setup(p_ch: Node3D, p_body: RagdollBody, p_anim: ProceduralAnimator, p_kind
 		saya = sy
 		MaterialLibrary.apply(saya)
 	scene.free()
-	scale = Vector3.ONE * body.scale_factor
+	scale = Vector3.ONE * body.scale_factor * AttackLibrary.WEAPON_SCALE
 	trail = SlashTrail.new()
 	trail.name = "Trail"
 	ch.add_child.call_deferred(trail)
@@ -73,8 +73,8 @@ func _attach_saya() -> void:
 		saya.get_parent().remove_child(saya)
 	pelvis.add_child(saya)
 	var b := AttackLibrary.grip_basis(AttackLibrary.SHEATH_DIR, Vector3(0, 1, 0))
-	var mouth := (AttackLibrary.SHEATH_GRIP + b.y * 0.03) * s
-	saya.transform = Transform3D(b.scaled(Vector3.ONE * s), mouth - Rig.pivot["pelvis"] * s - body.com["pelvis"])
+	var mouth := (AttackLibrary.sheath_grip() + b.y * 0.03) * s
+	saya.transform = Transform3D(b.scaled(Vector3.ONE * s * AttackLibrary.WEAPON_SCALE), mouth - Rig.pivot["pelvis"] * s - body.com["pelvis"])
 
 
 func _reparent_to(rb: RigidBody3D, local: Transform3D) -> void:
@@ -82,7 +82,7 @@ func _reparent_to(rb: RigidBody3D, local: Transform3D) -> void:
 		get_parent().remove_child(self)
 	rb.add_child(self)
 	transform = local
-	scale = Vector3.ONE * body.scale_factor
+	scale = Vector3.ONE * body.scale_factor * AttackLibrary.WEAPON_SCALE
 
 
 ## Puts the weapon in the right hand.
@@ -103,19 +103,19 @@ func sheathe() -> void:
 	var s := body.scale_factor
 	if kind == "katana":
 		var b := AttackLibrary.grip_basis(AttackLibrary.SHEATH_DIR, Vector3(0, 1, 0))
-		var pos: Vector3 = AttackLibrary.SHEATH_GRIP * s
+		var pos: Vector3 = AttackLibrary.sheath_grip() * s
 		_reparent_to(pelvis, Transform3D(b, pos - Rig.pivot["pelvis"] * s - body.com["pelvis"]))
 	elif kind == "yari":
 		# spear across the back, butt near the hip and head over the shoulder
 		var chest: RigidBody3D = body.parts["chest"]
 		var b := AttackLibrary.grip_basis(Vector3(-0.32, 0.94, 0.12), Vector3(0, 0, 1))
-		var pos := Vector3(0.22, 0.72, 0.2) * s
+		var pos := (Vector3(0.28, 0.72 + Rig.upper_shift(), 0.26)) * s
 		_reparent_to(chest, Transform3D(b, pos - Rig.pivot["chest"] * s - body.com["chest"]))
 	else:
 		# big weapons are slung on the back
 		var chest: RigidBody3D = body.parts["chest"]
 		var b := AttackLibrary.grip_basis(Vector3(0.35, -0.9, 0.2), Vector3(0, 0, 1))
-		var pos := Vector3(0.1, 1.45, 0.2) * s
+		var pos := (Vector3(0.12, 1.45 + Rig.upper_shift(), 0.26)) * s
 		_reparent_to(chest, Transform3D(b, pos - Rig.pivot["chest"] * s - body.com["chest"]))
 	in_hand = false
 
@@ -145,7 +145,7 @@ func drop(impulse := Vector3.ZERO) -> void:
 	if get_parent():
 		get_parent().remove_child(self)
 	rb.add_child(self)
-	transform = Transform3D(Basis.from_scale(Vector3.ONE * body.scale_factor), Vector3.ZERO)
+	transform = Transform3D(Basis.from_scale(Vector3.ONE * body.scale_factor * AttackLibrary.WEAPON_SCALE), Vector3.ZERO)
 	rb.apply_central_impulse(impulse)
 	rb.apply_torque_impulse(Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.6)
 
@@ -164,7 +164,7 @@ func _follow_grip() -> void:
 	var k := clampf(body.strength * float(body.part_strength.get("hand_r", 1.0)), 0.0, 1.0)
 	var q := phys.basis.get_rotation_quaternion().slerp(tgt.basis.orthonormalized().get_rotation_quaternion(), k)
 	var local := hand_xf.affine_inverse() * Transform3D(Basis(q), phys.origin)
-	transform = Transform3D(local.basis.orthonormalized() * Basis.from_scale(Vector3.ONE * body.scale_factor), local.origin)
+	transform = Transform3D(local.basis.orthonormalized() * Basis.from_scale(Vector3.ONE * body.scale_factor * AttackLibrary.WEAPON_SCALE), local.origin)
 
 
 func blade_points(n := 6) -> Array[Vector3]:

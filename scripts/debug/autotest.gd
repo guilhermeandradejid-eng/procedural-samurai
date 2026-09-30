@@ -14,6 +14,7 @@ var stats := {"kills": 0, "damage_taken": 0.0, "hits": 0, "blocked": 0, "parried
 var _bot_t := 0.0
 var _block_hold := 0.0
 var _shot_every := 180
+var _approach := 40.0
 var _done := false
 
 
@@ -29,6 +30,16 @@ func _ready() -> void:
 		Settings.values.quality = 0
 		var w := Game.world as World
 		w.apply_quality()
+		if args.has("lowgfx"):
+			# software-rendered captures: drop the most expensive effects
+			w.env.volumetric_fog_enabled = false
+			w.env.ssao_enabled = false
+			w.env.glow_enabled = false
+			w.grass.visible = false
+			w.sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+			w.sun.directional_shadow_max_distance = 60.0
+	_shot_every = int(OS.get_environment("AUTOTEST_SHOT_EVERY")) if OS.get_environment("AUTOTEST_SHOT_EVERY") != "" else 180
+	_approach = float(OS.get_environment("AUTOTEST_APPROACH")) if OS.get_environment("AUTOTEST_APPROACH") != "" else 40.0
 	Game.enemy_killed.connect(func(e: Node, _i: Dictionary) -> void:
 		stats.kills += 1
 		_log("killed %s" % e.name))
@@ -81,6 +92,13 @@ func _physics_process(delta: float) -> void:
 		_log("PLAYER DIED")
 		_finish()
 		return
+	var mode := OS.get_environment("AUTOTEST_MODE")
+	if mode == "standoff":
+		_standoff_bot()
+		return
+	if mode == "assassinate":
+		_assassin_bot()
+		return
 	_bot(delta)
 	if frame > int(OS.get_environment("AUTOTEST_FRAMES")) if OS.get_environment("AUTOTEST_FRAMES") != "" else frame > 60 * 150:
 		_finish()
@@ -100,7 +118,7 @@ func _place_near_camp() -> void:
 	camp = best
 	var c := Vector3(float(camp.x), 0, float(camp.z))
 	var road := (Game.world as World).settlements._entrance_dir(camp)
-	var at := c + Vector3(road.x, 0, road.y) * (float(camp.get("radius", 20.0)) + 40.0)
+	var at := c + Vector3(road.x, 0, road.y) * (float(camp.get("radius", 20.0)) + _approach)
 	at.y = d.get_height(at.x, at.z)
 	player.respawn(at + Vector3(0, 0.05, 0))
 	_log("placed near camp %s (%s) at %s" % [camp.id, camp.get("name", ""), at.snapped(Vector3.ONE)])
@@ -159,9 +177,67 @@ func _bot(delta: float) -> void:
 		Input.action_press("move_forward")
 
 
+var _so_phase := -1
+
+
+func _standoff_bot() -> void:
+	var main := get_parent()
+	if frame == 100:
+		Input.action_press("attack_light")
+		main._try_standoff()
+		_log("standoff requested, candidates %d" % player.standoff_candidates().size())
+	var so: Standoff = main._standoff if is_instance_valid(main._standoff) else null
+	if so == null:
+		if frame > 110 and _so_phase != 99:
+			_so_phase = 99
+			Input.action_release("attack_light")
+			_log("standoff over")
+		if frame > 110:
+			_bot(get_physics_process_delta_time())
+		return
+	if int(so.phase) != _so_phase:
+		_so_phase = int(so.phase)
+		_log("standoff phase %s kills %d" % [Standoff.Phase.keys()[_so_phase], so.kills])
+	if frame % 60 == 0 and so.current:
+		var c := so.current
+		_log("  current %s d %.1f spd %.1f dir %s action %s state %s terrified %.1f vel %s" % [c.name, c.global_position.distance_to(player.global_position), c.move_speed, c.move_dir, c.action, c.state, c.terrified, c.velocity])
+	if so.phase == Standoff.Phase.LUNGE and so._t > 0.15:
+		Input.action_release("attack_light")
+	elif so.phase in [Standoff.Phase.APPROACH, Standoff.Phase.WAIT] and not Input.is_action_pressed("attack_light"):
+		Input.action_press("attack_light")
+
+
+func _assassin_bot() -> void:
+	if frame == 80:
+		for e in get_tree().get_nodes_in_group("enemies"):
+			var en := e as Enemy
+			if en and not en.dead and en.state == Enemy.State.IDLE:
+				var back := en.global_basis.z
+				var at := en.global_position + back * 1.4
+				at.y = WorldData.current.get_height(at.x, at.z)
+				player.global_position = at + Vector3(0, 0.05, 0)
+				player.crouching = true
+				_log("teleported behind %s (idle_mode %s)" % [en.name, en.idle_mode])
+				break
+	if frame == 95:
+		var t := player.assassination_target()
+		_log("assassination target: %s" % [t.name if t else "none"])
+		_tap("interact")
+	if frame > 200:
+		_bot(get_physics_process_delta_time())
+
+
 func _tap(action: String) -> void:
-	Input.action_press(action)
-	get_tree().create_timer(0.06, true, false, true).timeout.connect(func() -> void: Input.action_release(action))
+	# a real input event, so _unhandled_input handlers see it too
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	get_tree().create_timer(0.06, true, false, true).timeout.connect(func() -> void:
+		var up := InputEventAction.new()
+		up.action = action
+		up.pressed = false
+		Input.parse_input_event(up))
 
 
 func _shot() -> void:

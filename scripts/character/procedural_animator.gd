@@ -61,7 +61,7 @@ func setup(p_ch: Node3D, p_body: RagdollBody, scale: float) -> void:
 	body = p_body
 	s = scale
 	Rig.ensure_loaded()
-	hand_to_weapon.origin *= s
+	hand_to_weapon.origin = Vector3(0.0, -float(Rig.meta.get("hand_grip_drop", 0.064)), -0.006) * s
 	for side in [1, -1]:
 		var f := Foot.new()
 		f.side = side
@@ -104,7 +104,8 @@ static func _basis_from_bone(bone_dir: Vector3, hinge: Vector3) -> Basis:
 	return Basis(x, y, z)
 
 
-## Two-bone IK. Returns [mid_point, end_point].
+## Two-bone IK. Returns [mid_point, end_point, hinge_axis]; the hinge axis is
+## the normal of the bend plane (stable even when the limb is nearly straight).
 static func solve_ik(root: Vector3, target: Vector3, l1: float, l2: float, pole_dir: Vector3) -> Array:
 	var to_t := target - root
 	var dist := clampf(to_t.length(), maxf(absf(l1 - l2) + 0.001, 0.02), l1 + l2 - 0.0005)
@@ -117,7 +118,7 @@ static func solve_ik(root: Vector3, target: Vector3, l1: float, l2: float, pole_
 	bend = bend.normalized()
 	var mid := root + (dir * cos(a) + bend * sin(a)) * l1
 	var end := root + dir * dist
-	return [mid, end]
+	return [mid, end, bend.cross(dir).normalized()]
 
 
 # ---------------------------------------------------------------- main
@@ -184,7 +185,7 @@ func update(delta: float, st: Dictionary) -> void:
 	var a_lean: float = key.get("lean", 0.0)
 	var crouch: float = key.get("crouch", 0.0)
 	if not key.is_empty():
-		var target_grip := Transform3D(AttackLibrary.grip_basis(key.dir, key.edge), key.pos * s)
+		var target_grip := Transform3D(AttackLibrary.grip_basis(key.dir, key.edge), (key.pos + Vector3(0.0, Rig.upper_shift(), 0.0)) * s)
 		if action == "attack" or action == "parry" or action == "chiburi" or action == "draw":
 			grip_char = target_grip if _last_grip_valid else target_grip
 			# fast but not instant blend so combos flow into each other
@@ -238,7 +239,7 @@ func update(delta: float, st: Dictionary) -> void:
 		for f in feet:
 			var hip_local := _p("thigh_r" if f.side > 0 else "thigh_l")
 			var hip_world := root * (hip_local + Vector3(0, -crouch * s + bob, 0))
-			var ankle := f.pos + Vector3(0, 0.095 * s, 0)
+			var ankle := f.pos + Vector3(0, Rig.ankle_height() * s, 0)
 			var dist := hip_world.distance_to(ankle)
 			if dist > leg_len * 0.985:
 				drop_needed = maxf(drop_needed, (dist - leg_len * 0.985) * 1.02)
@@ -259,15 +260,15 @@ func update(delta: float, st: Dictionary) -> void:
 		local_dir = local_dir.normalized() if local_dir.length() > 0.01 else Vector3.FORWARD
 		var axis := Vector3.UP.cross(local_dir).normalized()
 		root_rot = Basis(axis, ang)
-		root_pivot = Vector3(0, 0.52 * s, 0)
-		pelvis_pos.y = lerpf(pelvis_rest.y, 0.55 * s, sin(rt * PI))
+		root_pivot = Vector3(0, 0.44 * s, 0)
+		pelvis_pos.y = lerpf(pelvis_rest.y, 0.46 * s, sin(rt * PI))
 	var pelvis_local := Transform3D(pelvis_basis, pelvis_pos)
 	if action == "roll":
 		pelvis_local = Transform3D(root_rot, root_pivot) * Transform3D(Basis(), -root_pivot) * pelvis_local
 	if action == "sit" or action == "kneel":
-		pelvis_local.origin.y = (0.26 if action == "sit" else 0.48) * s
+		pelvis_local.origin.y = (0.27 if action == "sit" else 0.4) * s
 	if action == "getup":
-		pelvis_local.origin.y = lerpf(0.3 * s, pelvis_y, AttackLibrary.ease_curve(clampf(at / 0.9, 0.0, 1.0), "inout"))
+		pelvis_local.origin.y = lerpf(0.28 * s, pelvis_y, AttackLibrary.ease_curve(clampf(at / 0.9, 0.0, 1.0), "inout"))
 		pelvis_local.basis = Basis.from_euler(Vector3(deg_to_rad(lerpf(55.0, 0.0, clampf(at / 0.9, 0.0, 1.0))), 0, 0)) * pelvis_local.basis
 	var pelvis_w := root * pelvis_local
 
@@ -301,7 +302,7 @@ func update(delta: float, st: Dictionary) -> void:
 	var look: Variant = st.get("look_target", null)
 	var t_yaw := 0.0
 	var t_pitch := 0.0
-	var head_base := chest_w * (_p("head") - _p("chest") + Vector3(0, 0.16 * s, 0))
+	var head_base := chest_w * (_p("head") - _p("chest") + Rig.com_offset("head") * s)
 	if look is Vector3:
 		var to_t: Vector3 = chest_w.basis.inverse() * ((look as Vector3) - head_base)
 		t_yaw = clampf(atan2(-to_t.x, -to_t.z), -1.1, 1.1)
@@ -360,7 +361,7 @@ func _blend_xf(a: Transform3D, b: Transform3D, k: float) -> Transform3D:
 
 func _init_feet(root: Transform3D) -> void:
 	for f in feet:
-		var p := root * (Vector3(0.12 * f.side * s, 0.0, 0.0))
+		var p := root * (Vector3(0.16 * f.side * s, 0.0, 0.0))
 		var g := _ground(p, root.origin.y)
 		f.pos = g[0]
 		f.normal = g[1]
@@ -370,10 +371,10 @@ func _init_feet(root: Transform3D) -> void:
 
 
 func _ideal_foot(root: Transform3D, f: Foot, st: Dictionary) -> Vector3:
-	var off := Vector3(0.12 * f.side, 0.0, 0.0)
+	var off := Vector3(0.16 * f.side, 0.0, 0.0)
 	if st.get("combat", false) or st.get("weapon_in_hand", false):
 		# kendo-like stance: right foot forward, left foot back
-		off = Vector3(0.15 * f.side, 0.0, -0.17 if f.side > 0 else 0.15)
+		off = Vector3(0.2 * f.side, 0.0, -0.15 if f.side > 0 else 0.13)
 	if st.get("action", "") == "block":
 		off.z += 0.05
 	return root * (off * s)
@@ -384,7 +385,7 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 	var yaw := root.basis.get_euler().y
 	if speed > 0.35:
 		var sprintiness := clampf((speed - 1.6) / 5.5, 0.0, 1.0)
-		var stride := lerpf(1.25, 3.1, sprintiness) * s
+		var stride := lerpf(1.05, 2.6, sprintiness) * s
 		var duty := lerpf(0.6, 0.36, sprintiness)
 		var cycle_time := stride / maxf(speed, 0.1)
 		phase = fposmod(phase + speed * delta / stride, 1.0)
@@ -398,7 +399,7 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 			if swinging:
 				var t := (lp - duty) / (1.0 - duty)
 				var remaining := (1.0 - t) * (1.0 - duty) * cycle_time + duty * cycle_time * 0.5
-				var ideal := root.origin + hvel * remaining + root.basis.x * (0.12 * f.side * s)
+				var ideal := root.origin + hvel * remaining + root.basis.x * (0.16 * f.side * s)
 				var g := _ground(ideal, root.origin.y)
 				f.to = g[0]
 				f.normal = f.normal.lerp(g[1], 0.3).normalized()
@@ -457,21 +458,18 @@ func _update_feet(delta: float, root: Transform3D, hvel: Vector3, st: Dictionary
 func _leg_ik(root: Transform3D, pelvis_w: Transform3D, f: Foot) -> void:
 	var sfx := "_r" if f.side > 0 else "_l"
 	var hip := pelvis_w * (_p("thigh" + sfx) - _p("pelvis"))
-	var ankle := f.pos + Vector3(0, 0.095 * s, 0)
+	var ankle := f.pos + Vector3(0, Rig.ankle_height() * s, 0)
 	var l1 := Rig.bone_length("thigh" + sfx) * s
 	var l2 := Rig.bone_length("shin" + sfx) * s
 	var fwd := -root.basis.z
-	var pole := fwd + root.basis.x * 0.12 * f.side
+	var pole := fwd + root.basis.x * 0.2 * f.side
 	var r := solve_ik(hip, ankle, l1, l2, pole)
 	var knee: Vector3 = r[0]
 	var ank: Vector3 = r[1]
 	var d1 := knee - hip
 	var d2 := ank - knee
-	var hinge := d1.cross(d2)
-	if hinge.length_squared() < 1e-7:
-		hinge = -root.basis.x
 	# legs bend the other way round than arms: rest hinge maps to -X
-	var h := -hinge.normalized()
+	var h: Vector3 = -(r[2] as Vector3)
 	var T := body.targets
 	T["thigh" + sfx] = Transform3D(_basis_from_bone(d1, h), hip)
 	T["shin" + sfx] = Transform3D(_basis_from_bone(d2, h), knee)
@@ -523,7 +521,7 @@ func _legs_fk(root: Transform3D, pelvis_w: Transform3D, action: String, at: floa
 	for f in feet:
 		f.planted = true
 		f.phase_swing = false
-		f.pos = (T["foot_r" if f.side > 0 else "foot_l"] as Transform3D).origin - Vector3(0, 0.095 * s, 0)
+		f.pos = (T["foot_r" if f.side > 0 else "foot_l"] as Transform3D).origin - Vector3(0, Rig.ankle_height() * s, 0)
 
 
 # ---------------------------------------------------------------- arms
@@ -585,12 +583,10 @@ func _arm_ik(chest_w: Transform3D, shoulder: Vector3, hand_xf: Transform3D, side
 	var wrist: Vector3 = r[1]
 	var d1 := elbow - shoulder
 	var d2 := wrist - elbow
-	var hinge := d1.cross(d2)
-	if hinge.length_squared() < 1e-7:
-		hinge = chest_w.basis.x
+	var hinge: Vector3 = r[2]
 	var T := body.targets
-	T["upper_arm" + sfx] = Transform3D(_basis_from_bone(d1, hinge.normalized()), shoulder)
-	T["forearm" + sfx] = Transform3D(_basis_from_bone(d2, hinge.normalized()), elbow)
+	T["upper_arm" + sfx] = Transform3D(_basis_from_bone(d1, hinge), shoulder)
+	T["forearm" + sfx] = Transform3D(_basis_from_bone(d2, hinge), elbow)
 	T["hand" + sfx] = Transform3D(hand_xf.basis, wrist)
 
 

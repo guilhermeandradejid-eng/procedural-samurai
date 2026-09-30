@@ -284,6 +284,72 @@ func max_lunge() -> float:
 	return 2.6
 
 
+## An unaware enemy close behind (or beside) the player can be assassinated.
+func assassination_target() -> Enemy:
+	if dead or disarmed or action not in ["", "block"]:
+		return null
+	var best: Enemy = null
+	var bd := 2.4
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead or en.state == Enemy.State.COMBAT or en.standoff_mode:
+			continue
+		var to := global_position - en.global_position
+		to.y = 0.0
+		var d := to.length()
+		if d > bd:
+			continue
+		var fwd := -en.global_basis.z
+		if fwd.dot(to.normalized()) > 0.25:
+			continue   # it is looking at us
+		bd = d
+		best = en
+	return best
+
+
+func assassinate(target: Enemy) -> void:
+	var to := target.global_position - global_position
+	to.y = 0.0
+	face_dir = to.normalized()
+	rotation.y = atan2(-to.x, -to.z)
+	# the victim freezes for the blow
+	target.set_action("hit", 1.4)
+	target.body.strength = 0.6
+	if not weapon_drawn:
+		draw_weapon(true)
+	start_attack("assassinate")
+	aim_attack_at(target)
+	Game.kill_cam_requested.emit(target, 1.3)
+	Game.slowmo(1.0, 0.35)
+	SaveGame.data["assassinations"] = int(SaveGame.data.get("assassinations", 0)) + 1
+	# make sure the kill lands even if the thrust grazes
+	get_tree().create_timer(0.42).timeout.connect(func() -> void:
+		if is_instance_valid(target) and not target.dead:
+			var info := {"attacker": self, "part": "chest", "point": target.chest_position(), "dir": to.normalized(),
+				"damage": 999.0, "power": 2.0, "attack": "assassinate", "unblockable": true, "cut": "thrust"}
+			target.receive_hit(info)
+			hit_landed.emit(self, target, "killed", info))
+
+
+## Enemies that could answer a standoff challenge.
+func standoff_candidates() -> Array[Enemy]:
+	var out: Array[Enemy] = []
+	if dead or disarmed or action != "":
+		return out
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead:
+			continue
+		var d := en.global_position.distance_to(global_position)
+		if en.state == Enemy.State.COMBAT and en.has_token and d < 8.0:
+			return []   # already fighting up close
+		if d < 22.0:
+			out.append(en)
+	out.sort_custom(func(a: Enemy, b: Enemy) -> bool:
+		return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
+	return out
+
+
 func damage_multiplier() -> float:
 	return 1.0
 

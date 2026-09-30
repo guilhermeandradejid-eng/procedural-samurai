@@ -3,7 +3,7 @@ import numpy as np
 
 from dsp import (SR, t_axis, white, pink, brown, sine, glide, exp_glide, env_exp, env_points, lowpass, highpass,
                  bandpass, sweep_filter, resonator, modal, karplus, voice, taiko, woodblock, flute, reverb_mono,
-                 saturate, normalize, fade, mix, place, rng)
+                 saturate, normalize, fade, mix, place, rng)  # noqa: F401
 
 
 def whoosh(dur, f0, f1, f2, seed, q=2.5, body=0.0):
@@ -354,6 +354,23 @@ def blood_splat(seed):
     return normalize(fade(y), 0.5)
 
 
+def thunder(seed):
+    r = rng(seed)
+    dur = 6.0
+    t = t_axis(dur)
+    crack = saturate(bandpass(white(dur, seed), 300, 5000) * np.exp(-t / 0.08), 3.0) * 0.6
+    rumble = lowpass(brown(dur, seed + 1), 160) * env_points(dur, [(0, 0), (0.1, 1.0), (1.5, 0.7), (dur, 0)])
+    rolls = np.zeros(len(t))
+    for k in range(6):
+        at = r.uniform(0.3, 3.5)
+        d = r.uniform(0.8, 1.8)
+        roll_ = lowpass(brown(d, seed + 10 + k), 220) * env_points(d, [(0, 0), (d * 0.3, 1.0), (d, 0)])
+        place(rolls, roll_ * r.uniform(0.3, 0.7), at)
+    y = mix(crack, rumble * 1.2, rolls)
+    y = reverb_mono(y, 0.3, 3.0, seed)[: int(7 * SR)]
+    return normalize(fade(y, 0.002, 1.0), 0.9)
+
+
 # name -> (generator, variations)
 SFX = {
     "swing": (swing, 5), "swing_heavy": (swing_heavy, 3), "clash": (clash, 4), "parry": (parry, 3),
@@ -364,4 +381,5 @@ SFX = {
     "perfect": (perfect, 1), "resolve": (resolve, 1), "heal": (heal, 1), "shrine_bell": (shrine_bell, 1),
     "banner": (banner, 1), "victory_sting": (victory_sting, 1), "ui_move": (ui_move, 1), "ui_select": (ui_select, 1),
     "map_open": (map_open, 1), "guiding_wind": (guiding_wind, 1), "blood_splat": (blood_splat, 3),
+    "thunder": (thunder, 2),
 }

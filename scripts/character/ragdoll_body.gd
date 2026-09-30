@@ -16,11 +16,11 @@ const MASK_DEAD := 1 | (1 << 3) | (1 << 4)
 
 ## joint setup: child part -> [type, swing/lower deg, twist/upper deg]
 const JOINTS := {
-	"belly": ["cone", 28.0, 22.0], "chest": ["cone", 28.0, 25.0], "head": ["cone", 40.0, 50.0],
-	"upper_arm_r": ["cone", 95.0, 70.0], "upper_arm_l": ["cone", 95.0, 70.0],
+	"belly": ["cone", 34.0, 28.0], "chest": ["cone", 34.0, 30.0], "head": ["cone", 55.0, 60.0],
+	"upper_arm_r": ["cone", 150.0, 85.0], "upper_arm_l": ["cone", 150.0, 85.0],
 	"forearm_r": ["hinge", -5.0, 150.0], "forearm_l": ["hinge", -5.0, 150.0],
 	"hand_r": ["cone", 45.0, 35.0], "hand_l": ["cone", 45.0, 35.0],
-	"thigh_r": ["cone", 75.0, 30.0], "thigh_l": ["cone", 75.0, 30.0],
+	"thigh_r": ["cone", 100.0, 35.0], "thigh_l": ["cone", 100.0, 35.0],
 	"shin_r": ["hinge", -150.0, 5.0], "shin_l": ["hinge", -150.0, 5.0],
 	"foot_r": ["cone", 28.0, 12.0], "foot_l": ["cone", 28.0, 12.0],
 }

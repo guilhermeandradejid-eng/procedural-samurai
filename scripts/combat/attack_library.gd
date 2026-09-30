@@ -14,10 +14,21 @@ const WEAPONS := {
 	"yari": {"left_hand": 0.55, "reach": 2.2, "ideal": 1.9, "blade_start": 1.25, "blade_end": 1.64, "guard": "guard_yari", "two_handed": true, "mass": 2.0},
 }
 
-const SHEATH_GRIP := Vector3(-0.19, 0.99, -0.16)
+## Hip of the chibi body (torso is 1.32x wider than the human reference the
+## keyframes were authored for; the animator adds the vertical shift to all keys).
+const SHEATH_GRIP := Vector3(-0.25, 0.99, -0.21)
 const SHEATH_DIR := Vector3(0.12, -0.32, 0.94)
 
 static var _cache := {}
+
+## Weapons are drawn bigger than life: the chibi bodies look silly and the
+## blades read better at HFF proportions.
+const WEAPON_SCALE := 1.2
+
+
+## Where the sheathed hilt sits in root space for a body of scale s.
+static func sheath_grip() -> Vector3:
+	return SHEATH_GRIP + Vector3(0.0, Rig.upper_shift(), 0.0)
 
 
 static func key(t: float, pos: Vector3, dir: Vector3, edge: Vector3, twist := 0.0, lean := 0.0, crouch := 0.0, ease := "inout") -> Dictionary:

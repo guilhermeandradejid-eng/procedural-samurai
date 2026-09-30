@@ -73,7 +73,11 @@ var _sweep_sound_done := false
 var _exclude: Array[RID] = []
 
 
+const BODY_SCALE := 0.8   # base size of every character (HFF bodies are small)
+
+
 func _ready() -> void:
+	scale_factor *= BODY_SCALE
 	collision_layer = 1 << 1
 	collision_mask = 1 | (1 << 1)
 	floor_max_angle = deg_to_rad(52.0)
@@ -81,10 +85,11 @@ func _ready() -> void:
 	safe_margin = 0.02
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
+	var body_h := Rig.height() * scale_factor
 	cap.radius = 0.3 * scale_factor
-	cap.height = 1.75 * scale_factor
+	cap.height = body_h
 	cs.shape = cap
-	cs.position = Vector3(0, 0.875 * scale_factor, 0)
+	cs.position = Vector3(0, body_h * 0.5, 0)
 	add_child(cs)
 	var st: Dictionary = CharacterStyle.STYLES.get(style, CharacterStyle.STYLES["ronin"])
 	max_health = float(st.hp)
@@ -336,7 +341,7 @@ func aim_attack_at(target: Character) -> void:
 
 ## Distance between the two characters at which the current move cuts best.
 func strike_distance() -> float:
-	return float(attack.get("ideal", AttackLibrary.WEAPONS.get(weapon_kind, {}).get("ideal", 1.0))) * scale_factor
+	return float(attack.get("ideal", AttackLibrary.WEAPONS.get(weapon_kind, {}).get("ideal", 1.0))) * scale_factor * 1.12
 
 
 ## Target the current attack homes in on (null = straight ahead).

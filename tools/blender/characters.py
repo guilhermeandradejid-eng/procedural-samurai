@@ -50,13 +50,83 @@ SHAPES = {
 
 MIRROR = lambda p: (-p[0], p[1], p[2])  # noqa: E731
 
+# ------------------------------------------------------------------ chibi warp
+# The body and every piece of gear are first modelled with realistic proportions
+# (simple to author) and then squashed into Human-Fall-Flat proportions: a huge
+# head, a wide stubby torso, short thick limbs, mitten hands and big boots.
+# Each rig part gets an affine map about its own pivot (axial / radial scale
+# along its bone), chained so the joints stay connected. Gear follows the map of
+# the part it is attached to, and the animation code sees the rebuilt rig.json.
+#            axial, radial
+CHIBI = {
+    "pelvis": (1.0, 1.32), "belly": (1.0, 1.32), "chest": (1.0, 1.32),
+    "head": (1.85, 1.85),
+    "upper_arm": (0.95, 1.5), "forearm": (0.95, 1.5), "hand": (1.55, 1.55),
+    "thigh": (0.76, 1.42), "shin": (0.76, 1.42), "foot": (1.38, 1.38),
+}
+PART_ORDER = ["pelvis", "belly", "chest", "head", "upper_arm_r", "forearm_r", "hand_r", "upper_arm_l", "forearm_l", "hand_l",
+              "thigh_r", "shin_r", "foot_r", "thigh_l", "shin_l", "foot_l"]
+
+
+def _base(name):
+    return name[:-2] if name.endswith(("_r", "_l")) else name
+
+
+class PartWarp:
+    def __init__(self, old_p, new_p, mat):
+        self.old_p = Vector(old_p)
+        self.new_p = Vector(new_p)
+        self.mat = mat
+
+    def __call__(self, v):
+        return self.new_p + self.mat @ (Vector(v) - self.old_p)
+
+    def scale3(self):
+        """Approximate per-axis scale (for boxes)."""
+        return Vector((abs(self.mat[0][0]) + abs(self.mat[0][1]) * 0.0, abs(self.mat[1][1]), abs(self.mat[2][2])))
+
+
+def build_warps():
+    from mathutils import Matrix
+    warps = {}
+    for name in PART_ORDER:
+        r = RIG[name]
+        old_p = Vector(r["pivot"])
+        par = r["parent"]
+        new_p = old_p.copy() if par == "" else warps[par](old_p)
+        d = (Vector(r["end"]) - old_p).normalized()
+        ax, rad = CHIBI[_base(name)]
+        outer = Matrix(((d.x * d.x, d.x * d.y, d.x * d.z), (d.y * d.x, d.y * d.y, d.y * d.z), (d.z * d.x, d.z * d.y, d.z * d.z)))
+        mat = Matrix.Identity(3) * rad + outer * (ax - rad)
+        warps[name] = PartWarp(old_p, new_p, mat)
+    # put the soles of the boots back on the ground
+    foot = warps["foot_r"]
+    c = foot(Vector((RIG["foot_r"]["pivot"][0], 0.047, -0.055)))
+    bottom = c.y - 0.09 * CHIBI["foot"][0] * 0.5
+    dy = -bottom
+    for w in warps.values():
+        w.new_p = w.new_p + Vector((0.0, dy, 0.0))
+    return warps
+
+
+WARPS = None
+
+
+def warps():
+    global WARPS
+    if WARPS is None:
+        WARPS = build_warps()
+    return WARPS
+
 
 def _part(name, build):
     B = Builder()
     build(B)
+    W = warps()[name]
+    transform_since(B, 0, W)
     ob = B.to_object(name)
     ob = subsurf(ob, 1)
-    set_origin(ob, RIG[name]["pivot"])
+    set_origin(ob, W(RIG[name]["pivot"]))
     return ob
 
 
@@ -127,6 +197,9 @@ def build_body():
 def piece(name, build, origin, sub=1, thickness=0.0):
     B = Builder()
     build(B)
+    W = warps()[name.split("__")[0]]
+    transform_since(B, 0, W)
+    origin = W(origin)
     ob = B.to_object(name)
     if thickness > 0.0:
         ob = solidify(ob, thickness)
@@ -322,26 +395,49 @@ def build_gear():
 
 
 def write_rig():
-    rig = {"parts": {}, "shapes": {}}
+    W = warps()
+    rig = {"parts": {}, "shapes": {}, "meta": {}}
     for k, v in RIG.items():
-        rig["parts"][k] = {"parent": v["parent"], "pivot": list(v["pivot"]), "end": list(v["end"])}
+        w = W[k]
+        rig["parts"][k] = {"parent": v["parent"], "pivot": list(w(v["pivot"])), "end": list(w(v["end"]))}
     for k, v in RIG.items():
-        base = k[:-2] if k.endswith(("_r", "_l")) else k
+        base = _base(k)
+        w = W[k]
+        ax, rad = CHIBI[base]
         sh = dict(SHAPES[base])
         if sh["type"] == "capsule" and "a" not in sh:
-            sh["a"] = list(v["pivot"])
-            sh["b"] = list(v["end"])
+            sh["a"] = v["pivot"]
+            sh["b"] = v["end"]
         if k.startswith("foot"):
-            sh["center"] = [v["pivot"][0], 0.047, -0.055]
-        for key in ("center", "a", "b", "size"):
-            if key in sh:
-                sh[key] = list(sh[key])
-        rig["shapes"][k] = sh
+            sh["center"] = (v["pivot"][0], 0.047, -0.055)
+        out = {"type": sh["type"], "mass": round(sh["mass"] * rad * rad * ax, 2)}
+        if sh["type"] == "capsule":
+            out["a"] = list(w(sh["a"]))
+            out["b"] = list(w(sh["b"]))
+            out["radius"] = sh["radius"] * rad
+        elif sh["type"] == "sphere":
+            out["center"] = list(w(sh["center"]))
+            out["radius"] = sh["radius"] * rad
+        else:
+            out["center"] = list(w(sh["center"]))
+            out["size"] = [sh["size"][0] * rad, sh["size"][1] * (ax if k.startswith("foot") else 1.0 if base in ("pelvis", "chest") else ax), sh["size"][2] * rad]
+        rig["shapes"][k] = out
+    # numbers the animation code needs to remap its human-scale constants
+    old_chest = RIG["chest"]["pivot"][1]
+    new_chest = rig["parts"]["chest"]["pivot"][1]
+    rig["meta"] = {
+        "upper_shift": round(new_chest - old_chest, 4),
+        "ankle_height": round(rig["parts"]["foot_r"]["pivot"][1], 4),
+        "hand_grip_drop": round(0.064 * CHIBI["hand"][0], 4),
+        "head_center_y": round(rig["shapes"]["head"]["center"][1], 4),
+        "hip_height": round(rig["parts"]["thigh_r"]["pivot"][1], 4),
+        "height": round(rig["shapes"]["head"]["center"][1] + rig["shapes"]["head"]["radius"], 4),
+    }
     path = os.path.join(blib.MODELS, "characters", "rig.json")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(rig, f, indent=1)
-    print("    rig.json written")
+    print("    rig.json written", rig["meta"])
 
 
 def build():

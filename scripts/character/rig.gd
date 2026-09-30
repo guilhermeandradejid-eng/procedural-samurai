@@ -28,6 +28,7 @@ static var pivot := {}       # rest pivot (character space)
 static var end := {}         # rest end point (character space)
 static var shapes := {}
 static var children := {}
+static var meta := {}        # numbers from the model builder (see characters.py)
 
 
 static func ensure_loaded() -> void:
@@ -49,7 +50,31 @@ static func ensure_loaded() -> void:
 			if s.has(key):
 				s[key] = _v(s[key])
 		shapes[k] = s
+	meta = data.get("meta", {})
 	_loaded = true
+
+
+## How far the upper body sits below where the human-scale animation
+## constants expect it (the legs of the chibi body are shorter).
+static func upper_shift() -> float:
+	ensure_loaded()
+	return float(meta.get("upper_shift", 0.0))
+
+
+static func ankle_height() -> float:
+	ensure_loaded()
+	return float(meta.get("ankle_height", 0.095))
+
+
+## Ratio of this body's hip height to the human reference (0.87 m).
+static func leg_ratio() -> float:
+	ensure_loaded()
+	return float(meta.get("hip_height", 0.87)) / 0.87
+
+
+static func height() -> float:
+	ensure_loaded()
+	return float(meta.get("height", 1.83))
 
 
 static func _v(a: Array) -> Vector3:

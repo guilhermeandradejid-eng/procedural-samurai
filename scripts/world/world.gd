@@ -20,6 +20,7 @@ var grass: GrassSystem
 var forest: Forest
 var settlements: Settlements
 var population: Population
+var ambient: AmbientParticles
 var is_built := false
 
 
@@ -50,6 +51,16 @@ func build() -> void:
 	population.name = "Population"
 	add_child(population)
 	population.setup(data)
+	ambient = AmbientParticles.new()
+	ambient.name = "Ambient"
+	add_child(ambient)
+	weather.lightning_flash.connect(func(strength: float) -> void:
+		# thunder arrives a moment after the flash
+		get_tree().create_timer(randf_range(0.6, 2.8)).timeout.connect(func() -> void:
+			Audio.play("thunder", lerpf(-8.0, 0.0, strength), 0.1, "Ambience")))
+	Settings.changed.connect(func(key: String) -> void:
+		if key == "quality":
+			apply_quality())
 	is_built = true
 	built.emit()
 

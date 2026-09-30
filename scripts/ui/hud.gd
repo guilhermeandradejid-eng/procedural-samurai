@@ -25,6 +25,9 @@ var _trail_hold := 0.0
 var _help_t := 45.0
 var _last_hp := -1.0
 var _interact: Interactable = null
+var _assassin: Enemy = null
+var _standoff_ok := false
+var _standoff_hint_t := 0.0
 var _vis := 1.0
 
 
@@ -198,6 +201,7 @@ func _process(delta: float) -> void:
 		_last_hp = hp
 		(resolve_view as ResolveView).player = p
 		resolve_view.queue_redraw()
+		_standoff_hint_t -= real
 		_update_prompt(p)
 	# banners
 	if _banner_t >= 0.0:
@@ -223,8 +227,30 @@ func _process(delta: float) -> void:
 
 func _update_prompt(p: Player) -> void:
 	_interact = null
-	if p.dead or not Game.is_playing() or p.combat:
+	_assassin = null
+	if p.dead or not Game.is_playing() or not p.input_enabled:
 		prompt.text = ""
+		return
+	var at := p.assassination_target()
+	if at:
+		_assassin = at
+		prompt.text = "[%s]  Assassinar" % key_name("interact")
+		return
+	if p.combat:
+		prompt.text = ""
+		return
+	if _standoff_hint_t <= 0.0:
+		_standoff_hint_t = 0.5
+		_standoff_ok = false
+		var cands := p.standoff_candidates()
+		if not cands.is_empty():
+			var aware := false
+			for e in cands:
+				if e.state != Enemy.State.IDLE and e.global_position.distance_to(p.global_position) < 20.0:
+					aware = true
+			_standoff_ok = aware or cands[0].global_position.distance_to(p.global_position) < 14.0
+	if _standoff_ok:
+		prompt.text = "[%s]  Desafiar para um confronto" % key_name("standoff")
 		return
 	var best: Interactable = null
 	var bd := INF
@@ -245,6 +271,10 @@ func _update_prompt(p: Player) -> void:
 
 func current_interactable() -> Interactable:
 	return _interact
+
+
+func current_assassination() -> Enemy:
+	return _assassin if is_instance_valid(_assassin) else null
 
 
 static func key_name(action: String) -> String:
@@ -313,7 +343,7 @@ class MarkerOverlay extends Control:
 				continue
 			var v: float = d.value
 			var col := Color(1, 1, 1, 0.9).lerp(Color(1.0, 0.8, 0.2), smoothstep(0.3, 0.7, v)).lerp(UIKit.RED, smoothstep(0.75, 1.0, v))
-			var head := en.global_position + Vector3(0, 2.25 * en.scale_factor, 0)
+			var head := en.global_position + Vector3(0, (Rig.height() + 0.35) * en.scale_factor, 0)
 			var behind := cam.is_position_behind(head)
 			var sp := cam.unproject_position(head)
 			var margin := 40.0

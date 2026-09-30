@@ -77,8 +77,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Plays a scripted camera shot for `duration` seconds (real time).
 func cinematic(xf: Transform3D, duration: float, fov := 55.0, follow: Node3D = null) -> void:
+	var active := not _cine.is_empty()
 	_cine = {"xf": xf, "time": duration, "fov": fov, "follow": follow, "offset": xf.origin - (follow.global_position if follow else Vector3.ZERO)}
-	_cine_blend = 0.0
+	if not active:
+		_cine_blend = 0.0
 
 
 ## Side-on low shot framing the killer and the falling victim.
@@ -121,7 +123,7 @@ func _process(delta: float) -> void:
 		pitch = clampf(pitch - look.y * pad_sensitivity * real * 0.7 * inv, -1.25, 0.95)
 	# follow the (interpolated) body, not the capsule, so ragdoll motion reads
 	var tp := target.get_global_transform_interpolated().origin
-	var chest := tp + Vector3(0, 1.55 * target.scale_factor, 0)
+	var chest := tp + Vector3(0, Rig.height() * 0.78 * target.scale_factor, 0)
 	if target.action == "knockdown" or target.dead:
 		chest = target.body.part_interp_transform("chest").origin + Vector3(0, 0.3, 0)
 	_pivot = _pivot.lerp(chest, clampf(real * 12.0, 0.0, 1.0)) if _pivot != Vector3.ZERO else chest

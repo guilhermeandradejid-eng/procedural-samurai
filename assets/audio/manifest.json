@@ -138,6 +138,10 @@
    "sfx/sword_sheathe_0.ogg",
    "sfx/sword_sheathe_1.ogg"
   ],
+  "thunder": [
+   "sfx/thunder_0.ogg",
+   "sfx/thunder_1.ogg"
+  ],
   "ui_move": [
    "sfx/ui_move_0.ogg"
   ],
