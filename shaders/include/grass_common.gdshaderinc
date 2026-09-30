@@ -13,6 +13,7 @@ global uniform vec4 trample_1;
 global uniform vec4 trample_2;
 global uniform vec4 trample_3;
 global uniform float wetness;
+global uniform float rain_amount;
 global uniform float snow_amount;
 
 uniform vec3 base_color : source_color = vec3(0.07, 0.12, 0.03);
@@ -53,8 +54,13 @@ void grass_vertex(inout vec3 vtx, inout vec3 nrm, vec2 uv, vec4 vcol, vec4 ic, m
 	vec2 tp = trample_push(trample_0, root, t, flat_k) + trample_push(trample_1, root, t, flat_k)
 			+ trample_push(trample_2, root, t, flat_k) + trample_push(trample_3, root, t, flat_k);
 	disp += tp * blade_h * 1.3;
+	// wet blades are heavy: they droop over and clump together, rain makes them shiver
+	float droop = wetness * (0.35 + 0.4 * fract(ic.x * 7.31)) * t * t;
+	vec2 droop_dir = normalize(vec2(sin(ic.x * 31.0), cos(ic.x * 17.0)) + wind_dir * 0.6);
+	disp += droop_dir * droop * blade_h * 0.55;
+	disp += vec2(sin(time * 23.0 + ic.x * 50.0), cos(time * 19.0 + ic.x * 40.0)) * rain_amount * 0.025 * t * blade_h;
 	vtx.xz += disp;
-	vtx.y -= dot(disp, disp) * 0.45 / max(blade_h, 0.05) + flat_k * t * blade_h * 0.45;
+	vtx.y -= dot(disp, disp) * 0.45 / max(blade_h, 0.05) + flat_k * t * blade_h * 0.45 + droop * blade_h * 0.25;
 	nrm = normalize(mix(nrm, vec3(0.0, 1.0, 0.0), 0.5));
 	o_h = t;
 	// colour per instance: meadow <-> golden pampas, forest floor shade, clumps
@@ -76,6 +82,7 @@ void grass_vertex(inout vec3 vtx, inout vec3 nrm, vec2 uv, vec4 vcol, vec4 ic, m
 vec3 grass_color(float h, vec3 base, vec3 tip) {
 	vec3 col = mix(base, tip, smoothstep(0.0, 0.95, h));
 	col *= mix(0.5, 1.0, smoothstep(0.0, 0.45, h));
-	col *= mix(1.0, 0.7, wetness);
+	col *= mix(1.0, 0.62, wetness);
+	col = mix(col, col * vec3(0.85, 0.95, 0.9), wetness * 0.5);
 	return col;
 }

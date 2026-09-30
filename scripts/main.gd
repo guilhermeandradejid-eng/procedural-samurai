@@ -16,12 +16,24 @@ var _standoff: Standoff = null
 
 
 func _ready() -> void:
+	if Game.auto_test:
+		SaveGame.reset()
 	world = World.new()
 	world.name = "World"
 	add_child(world)
 	Game.world = world
 	world.build()
 	var args := OS.get_cmdline_user_args()
+	var wi := args.find("--weather")
+	if wi >= 0 and wi + 1 < args.size():
+		world.weather.auto_change = false
+		world.weather.set_state(args[wi + 1], true)
+		if args[wi + 1] in ["rain", "storm"]:
+			world.weather.wetness = 1.0
+	var hi := args.find("--time")
+	if hi >= 0 and hi + 1 < args.size():
+		world.time_of_day.time = float(args[hi + 1])
+		world.time_of_day.paused = true
 	var ti := args.find("--tour")
 	if ti >= 0:
 		_tour = true

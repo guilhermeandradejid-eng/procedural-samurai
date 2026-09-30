@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
 
 // Soft doll-like skin (Human Fall Flat look): warm diffuse, subsurface
 // scattering, broad rim light, plus blood and hit flash.
@@ -18,12 +18,16 @@ void vertex() {
 }
 
 void fragment() {
+	if (slice_clipped(v_local)) {
+		discard;
+	}
 	vec3 c = color;
 	// subtle blotchiness so large parts do not look like plastic
 	c *= 0.96 + 0.06 * noise3(v_local * 12.0);
 	float r = mix(roughness, 0.18, glossy);
 	vec3 e = vec3(0.0);
 	apply_character_fx(c, r, e);
+	slice_interior(FRONT_FACING, c, r, e);
 	ALBEDO = c;
 	ROUGHNESS = r;
 	SPECULAR = mix(0.35, 0.7, glossy);

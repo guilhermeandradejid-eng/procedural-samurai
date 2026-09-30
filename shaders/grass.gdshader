@@ -18,8 +18,8 @@ void vertex() {
 void fragment() {
 	vec3 col = grass_color(v_h, v_base, v_tip);
 	ALBEDO = col;
-	ROUGHNESS = mix(0.62, 0.3, wetness);
-	SPECULAR = 0.28;
+	ROUGHNESS = mix(0.62, 0.14, wetness);
+	SPECULAR = mix(0.28, 0.75, wetness);
 	BACKLIGHT = col * backlight;
 	if (!FRONT_FACING) {
 		NORMAL = -NORMAL;

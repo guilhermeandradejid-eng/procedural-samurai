@@ -34,6 +34,7 @@ var input_enabled := true
 
 func _init() -> void:
 	style = "player"
+	can_lose_limbs = false
 	team = Team.PLAYER
 	scale_factor = 1.0
 

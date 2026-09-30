@@ -335,6 +335,72 @@ func sparks(pos: Vector3, dir: Vector3, strength := 1.0) -> void:
 	tw.tween_callback(light.queue_free)
 
 
+## Comic-book sound word popping out of a hit (TCHAC!, SPLAT!...).
+func comic(pos: Vector3, text: String, color := Color(1.0, 0.85, 0.2), size := 1.0) -> void:
+	if not bool(Settings.get_value("comic_text", true)):
+		return
+	var l := Label3D.new()
+	l.text = text
+	l.font = UIKit.font("title")
+	l.font_size = 72
+	l.pixel_size = 0.0022 * size
+	l.modulate = color
+	l.outline_modulate = Color(0.08, 0.02, 0.02)
+	l.outline_size = 16
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.shaded = false
+	l.double_sided = true
+	l.render_priority = 10
+	_add(l)
+	l.global_position = pos
+	l.rotation.z = randf_range(-0.25, 0.25)
+	l.scale = Vector3.ONE * 0.2
+	var tw := l.create_tween().set_parallel(true)
+	tw.tween_property(l, "scale", Vector3.ONE * 1.25, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "position:y", pos.y + 0.6, 1.1).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(l, "modulate:a", 0.0, 0.35).set_delay(0.45)
+	tw.tween_callback(l.queue_free)
+
+
+## Expanding ring + flash, used for parries and heavy impacts.
+func shockwave(pos: Vector3, color := Color(1.0, 0.9, 0.6), size := 1.0) -> void:
+	_setup()
+	var m := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 1)
+	var gt := GradientTexture2D.new()
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0))
+	g.add_point(0.6, Color(1, 1, 1, 0))
+	g.add_point(0.86, Color(1, 1, 1, 1))
+	g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 128
+	gt.height = 128
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = gt
+	mat.albedo_color = Color(color.r * 2.2, color.g * 2.2, color.b * 2.2, 1.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.no_depth_test = true
+	q.material = mat
+	m.mesh = q
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_add(m)
+	m.global_position = pos
+	m.scale = Vector3.ONE * 0.1
+	var tw := m.create_tween().set_parallel(true)
+	tw.tween_property(m, "scale", Vector3.ONE * 2.6 * size, 0.28).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.28)
+	tw.chain().tween_callback(m.queue_free)
+
+
 func dust(pos: Vector3, strength := 1.0) -> void:
 	_setup()
 	_particles(pos + Vector3(0, 0.1, 0), Vector3.UP, _mat_dust, _mesh_puff, int(6 * strength) + 2, 1.1, _dust_mat)

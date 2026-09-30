@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
 
 // Lacquered lamellar armour: glossy plates, coloured silk lacing (odoshi),
 // metal rivets, worn edges; plus blood and hit flash.
@@ -21,6 +21,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (slice_clipped(v_local)) {
+		discard;
+	}
 	vec3 n = normalize(v_local_n);
 	vec3 w = pow(abs(n), vec3(4.0));
 	w /= (w.x + w.y + w.z);
@@ -37,9 +40,13 @@ void fragment() {
 	r = mix(r, 0.35, m.b);
 	vec3 e = vec3(0.0);
 	apply_character_fx(c, r, e);
+	slice_interior(FRONT_FACING, c, r, e);
 	ALBEDO = c;
 	ROUGHNESS = r;
 	METALLIC = max(m.b * 0.9, metallic_plate * (1.0 - lace));
 	SPECULAR = 0.6;
 	EMISSION = e;
+	if (!FRONT_FACING && dot(slice_plane.xyz, slice_plane.xyz) > 0.01) {
+		METALLIC = 0.0;
+	}
 }

@@ -92,3 +92,4 @@ func _process(delta: float) -> void:
 	if wind:
 		wind.weather_boost = wind_boost
 	RenderingServer.global_shader_parameter_set("wetness", wetness)
+	RenderingServer.global_shader_parameter_set("rain_amount", rain)

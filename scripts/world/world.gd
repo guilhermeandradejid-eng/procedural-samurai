@@ -21,6 +21,8 @@ var forest: Forest
 var settlements: Settlements
 var population: Population
 var ambient: AmbientParticles
+var mist: Mist
+var lightning_light: DirectionalLight3D
 var is_built := false
 
 
@@ -54,7 +56,19 @@ func build() -> void:
 	ambient = AmbientParticles.new()
 	ambient.name = "Ambient"
 	add_child(ambient)
+	mist = Mist.new()
+	mist.name = "Mist"
+	add_child(mist)
+	lightning_light = DirectionalLight3D.new()
+	lightning_light.name = "LightningLight"
+	lightning_light.light_color = Color(0.75, 0.82, 1.0)
+	lightning_light.light_energy = 0.0
+	lightning_light.shadow_enabled = true
+	lightning_light.light_volumetric_fog_energy = 3.0
+	lightning_light.directional_shadow_max_distance = 120.0
+	add_child(lightning_light)
 	weather.lightning_flash.connect(func(strength: float) -> void:
+		_lightning_flash(strength)
 		# thunder arrives a moment after the flash
 		get_tree().create_timer(randf_range(0.6, 2.8)).timeout.connect(func() -> void:
 			Audio.play("thunder", lerpf(-8.0, 0.0, strength), 0.1, "Ambience")))
@@ -63,6 +77,19 @@ func build() -> void:
 			apply_quality())
 	is_built = true
 	built.emit()
+
+
+## Lightning: a few violent flickers from a random direction, lighting the
+## clouds (sky shader) and every drop of fog.
+func _lightning_flash(strength: float) -> void:
+	lightning_light.rotation_degrees = Vector3(randf_range(-80.0, -55.0), randf_range(0.0, 360.0), 0.0)
+	var tw := create_tween()
+	for i in randi_range(2, 4):
+		tw.tween_property(lightning_light, "light_energy", randf_range(2.5, 5.0) * strength, 0.03)
+		tw.tween_property(lightning_light, "light_energy", randf_range(0.0, 0.5), 0.05)
+		tw.tween_interval(randf_range(0.02, 0.09))
+	tw.tween_property(lightning_light, "light_energy", 0.0, 0.2)
+	Game.shake(0.12 * strength)
 
 
 func _noise_texture(seed: int, freq: float, octaves: int, cellular := false) -> NoiseTexture2D:

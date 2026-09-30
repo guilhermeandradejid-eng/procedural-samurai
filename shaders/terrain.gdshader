@@ -21,6 +21,26 @@ uniform float distant_tint_start = 20.0;
 uniform float distant_tint_end = 160.0;
 
 global uniform float wetness;
+global uniform float rain_amount;
+
+// animated rain ripples: returns a height-field gradient (xz) for puddles
+vec2 rain_ripples(vec2 p, float t) {
+	vec2 g = vec2(0.0);
+	for (int layer = 0; layer < 2; layer++) {
+		vec2 q = p * (layer == 0 ? 2.3 : 3.7) + float(layer) * 9.1;
+		vec2 cell = floor(q);
+		vec2 f = fract(q) - 0.5;
+		float h1 = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+		float h2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
+		float ph = fract(t * (0.8 + h2 * 0.6) + h1);
+		vec2 c = f - (vec2(h1, h2) - 0.5) * 0.6;
+		float d = length(c);
+		float r = ph * 0.45;
+		float ring = sin((d - r) * 60.0) * exp(-abs(d - r) * 14.0) * (1.0 - ph) * step(h1, 0.35 + rain_amount * 0.5);
+		g += normalize(c + vec2(1e-4)) * ring * 0.5;
+	}
+	return g;
+}
 global uniform float snow_amount;
 
 varying vec3 v_world;
@@ -179,13 +199,20 @@ void fragment() {
 	albedo *= 0.86 + 0.28 * macro;
 	albedo = mix(albedo, albedo * vec3(1.06, 1.0, 0.9), smoothstep(0.55, 0.8, macro) * 0.5);
 
-	// rain: darker, glossier, puddles on flat ground
-	float flat_area = smoothstep(0.08, 0.0, slope);
+	// rain: darker, glossier, puddles that gather in the low flat spots
+	float flat_area = smoothstep(0.1, 0.0, slope);
 	float wet = wetness * (1.0 - w[L_SNOW]);
-	albedo *= mix(1.0, 0.62, wet);
-	rough = mix(rough, 0.18, wet * (0.55 + 0.45 * flat_area * step(0.55, micro)));
+	float puddle = wet * flat_area * smoothstep(0.52, 0.4, macro) * smoothstep(0.3, 0.9, wetness) * (1.0 - w[L_ROCK]);
+	albedo *= mix(1.0, 0.58, wet);
+	albedo = mix(albedo, albedo * vec3(0.55, 0.6, 0.66), puddle);
+	rough = mix(rough, 0.16, wet * 0.6);
+	rough = mix(rough, 0.02, puddle);
 
-	vec3 n_world = normalize(wn + nsum * detail_normal * (1.0 - far_mix * 0.6));
+	vec3 n_world = normalize(wn + nsum * detail_normal * (1.0 - far_mix * 0.6) * (1.0 - puddle * 0.9));
+	if (puddle > 0.02 && rain_amount > 0.05 && dist < 45.0) {
+		vec2 rg = rain_ripples(wp.xz, TIME);
+		n_world = normalize(n_world + vec3(rg.x, 0.0, rg.y) * puddle * rain_amount * (1.0 - dist / 45.0));
+	}
 	ALBEDO = albedo;
 	ROUGHNESS = clamp(rough, 0.05, 1.0);
 	SPECULAR = 0.35;

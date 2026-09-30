@@ -45,6 +45,8 @@ var gravity_accel := 17.0
 var accel_ground := 32.0
 var accel_air := 5.0
 var external_velocity := Vector3.ZERO
+var crippled := false
+var can_lose_limbs := true
 var attack_target: Character = null
 var attack_step := 0.0
 var attack_step_window := Vector2.ZERO
@@ -115,6 +117,7 @@ func _ready() -> void:
 	else:
 		weapon.sheathe()
 	body.part_severed.connect(_on_part_severed)
+	body.part_sliced.connect(_on_part_sliced)
 	face_dir = -global_basis.z
 	# settle the body on the initial pose
 	animator.update(1.0 / 60.0, anim_state())
@@ -425,7 +428,7 @@ func _update_action(delta: float) -> void:
 				_sweep_sound_done = true
 				Audio.play_at("swing_heavy" if float(attack.get("power", 1.0)) > 1.4 else "swing", weapon.tip(), -2.0, 0.1)
 			if action_time >= act[0] and action_time <= act[1] and not weapon.sweeping:
-				weapon.begin_sweep()
+				weapon.begin_sweep(_trail_color())
 			elif action_time > act[1] and weapon.sweeping:
 				weapon.end_sweep()
 			if queued_attack != "" and action_time >= float(attack.get("cancel", 99.0)):
@@ -438,7 +441,7 @@ func _update_action(delta: float) -> void:
 		"knockdown":
 			knock_timer -= delta
 			var still: bool = (body.parts["pelvis"] as RigidBody3D).linear_velocity.length() < 1.0
-			if knock_timer <= 0.0 and still:
+			if knock_timer <= 0.0 and still and not crippled:
 				set_action("getup", 0.9)
 				animator.initialized = false
 		"getup":
@@ -482,6 +485,7 @@ func _on_weapon_struck(target: Node, part: String, point: Vector3, dir: Vector3)
 		"attack": attack.get("name", ""), "power": float(attack.get("power", 1.0)),
 		"unblockable": attack.get("unblockable", false), "breaks_guard": attack.get("breaks_guard", false),
 		"cut": attack.get("cut", "horizontal"), "hitstop": float(attack.get("hitstop", 0.06)),
+		"blade": weapon.global_basis.y,
 	}
 	info.damage *= damage_multiplier()
 	var result := t.receive_hit(info)
@@ -527,6 +531,7 @@ func receive_hit(info: Dictionary) -> String:
 			return "parried"
 		guard -= float(info.get("guard_damage", 10.0))
 		FX.sparks(point, -dir, 1.0)
+		FX.comic(point + Vector3(0, 0.3, 0), ["CLANG!", "TANG!", "CLONC!"][randi() % 3], Color(0.85, 0.9, 1.0), 0.9)
 		Audio.play_at("clash", point, 0.0, 0.1)
 		Game.shake(0.25)
 		Game.hitstop(0.05)
@@ -553,9 +558,18 @@ func receive_hit(info: Dictionary) -> String:
 		body.weaken(part, 0.1)
 		Audio.play_at("flesh_cut", point, 0.0, 0.1)
 		Game.hitstop(float(info.get("hitstop", 0.06)))
+		FX.comic(point + Vector3(0, 0.25, 0), HIT_WORDS[randi() % HIT_WORDS.size()], Color(1.0, 0.82, 0.15), 0.9 + 0.15 * power)
+		FX.shockwave(point, Color(1.0, 0.5, 0.3), 0.5 + 0.2 * power)
+		_lens_hit(point)
 	if health <= 0.0:
 		die(info)
 		return "killed"
+	# strong blows can take a limb off even when the fight goes on
+	if can_lose_limbs and not info.get("fall", false) and power >= 1.35 and Game.rng.randf() < 0.28 * (power - 0.9) \
+			and bool(Settings.get_value("gore", true)):
+		var lp := _limb_of(part)
+		if lp != "" and _slice_part(lp, info, false):
+			return "hit"
 	if power >= 1.7 or info.get("breaks_guard", false):
 		stagger(dir, power * 0.8)
 	elif action != "attack" or power >= 1.2:
@@ -565,16 +579,111 @@ func receive_hit(info: Dictionary) -> String:
 	return "hit"
 
 
+const HIT_WORDS := ["TCHAC!", "SHLASH!", "PLAFT!", "SPLOSH!", "ZAP!", "TCHUM!"]
+const SLICE_WORDS := ["SHLUNK!", "FATIA!", "SCHLUP!", "TCHAU!", "SPLASH!"]
+
+
+func _lens_hit(point: Vector3) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.global_position.distance_to(point) < 3.6:
+		Game.lens_splash.emit(0.45, Color(0.5, 0.02, 0.02))
+
+
+## Limb (or torso part) that a blow to `part` would remove.
+func _limb_of(part: String) -> String:
+	match part:
+		"upper_arm_r", "forearm_r", "hand_r", "upper_arm_l", "forearm_l", "hand_l":
+			return part.replace("hand", "forearm")
+		"thigh_r", "shin_r", "foot_r", "thigh_l", "shin_l", "foot_l":
+			return part.replace("foot", "shin")
+	return ""
+
+
+func _cut_normal(info: Dictionary) -> Vector3:
+	var dir: Vector3 = info.get("dir", Vector3.FORWARD)
+	var blade: Vector3 = info.get("blade", Vector3.UP)
+	var n := dir.cross(blade)
+	if n.length() < 0.35:
+		n = dir.cross(Vector3.UP)
+	if n.length() < 0.35:
+		n = Vector3.RIGHT
+	return n.normalized()
+
+
+## Cuts `part` clean through along the blade's plane. Returns true on success.
+func _slice_part(part: String, info: Dictionary, lethal: bool) -> bool:
+	var point: Vector3 = info.get("point", global_position + Vector3(0, 1.0, 0))
+	var dir: Vector3 = info.get("dir", Vector3.FORWARD)
+	var rb: RigidBody3D = body.parts[part]
+	# aim the cut through the body axis at the hit height
+	var axis_pt: Vector3 = body.part_transform(part).origin.lerp(body.part_transform(part).origin + (global_basis * (Rig.end[part] - Rig.pivot[part]) * scale_factor), 0.5)
+	var cut_pt := point if point.distance_to(axis_pt) < 0.3 else point.lerp(axis_pt, 0.6)
+	var imp := (dir * 3.2 + Vector3.UP * 2.2) * float(rb.mass)
+	var chunk := body.slice(part, cut_pt, _cut_normal(info), imp)
+	return chunk != null
+
+
+func _on_part_sliced(part: String, chunk: RigidBody3D, wpoint: Vector3, wnormal: Vector3) -> void:
+	var rb: RigidBody3D = body.parts[part]
+	FX.stump_fountain(rb, rb.global_transform.affine_inverse() * wpoint, rb.global_basis.inverse() * wnormal, 3.5)
+	FX.stump_fountain(chunk, chunk.global_transform.affine_inverse() * wpoint, chunk.global_basis.inverse() * -wnormal, 2.4)
+	FX.blood_burst(wpoint, wnormal, 2.0)
+	FX.comic(wpoint + Vector3(0, 0.4, 0), SLICE_WORDS[randi() % SLICE_WORDS.size()], Color(1.0, 0.25, 0.2), 1.3)
+	FX.shockwave(wpoint, Color(1.0, 0.3, 0.2), 0.9)
+	Audio.play_at("dismember", wpoint, 3.0)
+	Audio.play_at("squish", wpoint, 0.0, 0.1)
+	get_tree().create_timer(0.55).timeout.connect(func() -> void:
+		if is_instance_valid(chunk):
+			Audio.play_at("boing", chunk.global_position, -2.0, 0.15)
+			FX.comic(chunk.global_position + Vector3(0, 0.3, 0), "BOING!", Color(0.6, 1.0, 0.5), 0.8))
+	Game.shake(0.5)
+	Game.hitstop(0.1)
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.global_position.distance_to(wpoint) < 4.5:
+		Game.lens_splash.emit(0.9, Color(0.55, 0.02, 0.02))
+	SaveGame.data.dismemberments = int(SaveGame.data.get("dismemberments", 0)) + 1
+	if part in ["upper_arm_r", "forearm_r"]:
+		if weapon and not weapon.dropped:
+			weapon.drop(Vector3.UP * 2.0)
+		disarmed = true
+	if part in ["thigh_r", "shin_r", "thigh_l", "shin_l"] and not dead:
+		crippled = true
+		bleeding = maxf(bleeding, 12.0)
+		knockdown((global_basis * Vector3(0, 1.5, 2.0)))
+	if not dead and part in ["head", "chest", "belly"]:
+		health = 0.0
+		die({"attacker": null, "cause": "slice", "dir": wnormal, "power": 1.0})
+	elif not dead:
+		bleeding = maxf(bleeding, 5.0)
+		Audio.play_at("scream", global_position + Vector3(0, 1.4, 0), 2.0, 0.1)
+
+
 func _on_dodged(_info: Dictionary) -> void:
 	pass
 
 
+func _trail_color() -> Color:
+	var n: String = attack.get("name", "")
+	if n in ["heavy", "smash", "sweep"]:
+		return Color(1.0, 0.75, 0.3, 1.0)
+	if n in ["enemy_heavy"]:
+		return Color(1.0, 0.25, 0.15, 1.0)
+	if n == "counter":
+		return Color(1.0, 0.5, 0.25, 1.0)
+	if n in ["iai", "assassinate"]:
+		return Color(1.0, 1.0, 1.0, 1.0)
+	return Color(0.85, 0.93, 1.0, 0.95) if team == Team.PLAYER else Color(1.0, 0.85, 0.8, 0.8)
+
+
 func _on_parried(info: Dictionary) -> void:
 	var point: Vector3 = info.get("point", global_position)
-	FX.sparks(point, -(info.get("dir", Vector3.FORWARD) as Vector3), 2.2)
+	FX.sparks(point, -(info.get("dir", Vector3.FORWARD) as Vector3), 3.4)
+	FX.shockwave(point, Color(1.0, 0.95, 0.75), 1.9)
+	FX.comic(point + Vector3(0, 0.35, 0), ["PARRY!", "TING!", "TANG!!"][randi() % 3], Color(1.0, 0.95, 0.6), 1.25)
+	Game.flash(Color(1.0, 0.97, 0.9), 0.55)
 	Audio.play_at("parry", point, 3.0)
-	Game.hitstop(0.09)
-	Game.shake(0.35)
+	Game.hitstop(0.12)
+	Game.shake(0.5)
 	set_action("parry", 0.34)
 	blocking = false
 
@@ -591,9 +700,15 @@ func die(info: Dictionary) -> void:
 	collision_mask = 1
 	var gore: bool = Settings.get_value("gore", true)
 	var severed := ""
-	if gore and not info.get("fall", false) and info.has("attacker"):
-		severed = _choose_dismemberment(info)
+	var sliced := false
 	var dir: Vector3 = info.get("dir", Vector3.FORWARD)
+	if gore and not info.get("fall", false) and info.has("attacker"):
+		var sp := _choose_slice(info)
+		if sp != "":
+			body.dead = false          # the stump keeps flopping under its own drive
+			sliced = _slice_part(sp, info, true)
+		if not sliced:
+			severed = _choose_dismemberment(info)
 	body.die()
 	if severed != "":
 		var imp: Vector3 = (dir * 3.5 + Vector3.UP * (4.0 if severed == "head" else 1.5)) * float(body.parts[severed].mass)
@@ -607,6 +722,28 @@ func die(info: Dictionary) -> void:
 	Audio.play_at("body_fall", global_position, -4.0)
 	FX.blood_pool_later(self)
 	died.emit(self, info)
+
+
+## Part to slice through for a killing blow (or "" for a joint dismemberment).
+func _choose_slice(info: Dictionary) -> String:
+	var cut: String = info.get("cut", "horizontal")
+	if cut in ["crush", "thrust"]:
+		return ""
+	var power: float = info.get("power", 1.0)
+	var chance := 0.55 + 0.3 * clampf(power - 1.0, 0.0, 1.0)
+	if power >= 1.8:
+		chance = 1.0
+	if Game.rng.randf() > chance:
+		return ""
+	var part: String = info.get("part", "chest")
+	match part:
+		"head":
+			return "head" if Game.rng.randf() < 0.4 else ""
+		"chest", "belly", "pelvis":
+			return "chest" if part == "chest" else "belly"
+		_:
+			return _limb_of(part)
+	return ""
 
 
 func _choose_dismemberment(info: Dictionary) -> String:
@@ -641,8 +778,24 @@ func _on_part_severed(part: String, stump: String) -> void:
 	var dir: Vector3 = (Rig.end[part] - Rig.pivot[part]).normalized()
 	FX.stump_fountain(body.parts[stump], body.parts[stump].global_transform.affine_inverse() * rb.global_position, body.parts[stump].global_basis.inverse() * (global_basis * dir), 2.8)
 	FX.stump_fountain(rb, Vector3.ZERO, -(Rig.end[part] - Rig.pivot[part]).normalized(), 1.6)
-	FX.blood_burst(rb.global_position, global_basis * dir, 1.6)
+	FX.blood_burst(rb.global_position, global_basis * dir, 2.2)
+	FX.comic(rb.global_position + Vector3(0, 0.35, 0), "PLOFT!" if part == "head" else SLICE_WORDS[randi() % SLICE_WORDS.size()], Color(1.0, 0.25, 0.2), 1.25)
+	FX.shockwave(rb.global_position, Color(1.0, 0.3, 0.2), 0.9)
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.global_position.distance_to(rb.global_position) < 4.5:
+		Game.lens_splash.emit(0.8, Color(0.55, 0.02, 0.02))
+	if part == "head":
+		# heads are bouncy: BOING
+		var bouncy := PhysicsMaterial.new()
+		bouncy.bounce = 0.55
+		bouncy.friction = 0.6
+		rb.physics_material_override = bouncy
+		get_tree().create_timer(0.7).timeout.connect(func() -> void:
+			if is_instance_valid(rb):
+				Audio.play_at("boing", rb.global_position, -1.0, 0.15)
+				FX.comic(rb.global_position + Vector3(0, 0.3, 0), "BOING!", Color(0.6, 1.0, 0.5), 0.9))
 	Audio.play_at("dismember", rb.global_position, 3.0)
+	Audio.play_at("squish", rb.global_position, 0.0, 0.1)
 	Game.shake(0.45)
 	SaveGame.data.dismemberments = int(SaveGame.data.get("dismemberments", 0)) + 1
 	if part.begins_with("forearm_r") or part.begins_with("upper_arm_r") or part == "hand_r":

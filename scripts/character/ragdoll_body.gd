@@ -8,6 +8,8 @@ extends Node3D
 ## severed (dismemberment) at any joint.
 
 signal part_severed(part: String, stump_part: String)
+## A part was cut clean through: `chunk` is the far half (carrying every child).
+signal part_sliced(part: String, chunk: RigidBody3D, world_point: Vector3, world_normal: Vector3)
 
 const LAYER_ALIVE := 1 << 2
 const LAYER_DEAD := 1 << 3
@@ -40,6 +42,7 @@ var dead := false
 var kinematic := false
 var gear := {}            # piece name -> MeshInstance3D
 var overrides := {}
+var chunks: Array[RigidBody3D] = []   # far halves of sliced parts
 var _swing := []          # secondary motion state for hanging armour
 var _prev_vel := {}
 var _flash := {}
@@ -388,6 +391,140 @@ func sever(part: String, imp := Vector3.ZERO) -> bool:
 	return true
 
 
+const SLICEABLE := ["head", "chest", "belly", "upper_arm_r", "forearm_r", "upper_arm_l", "forearm_l",
+	"thigh_r", "shin_r", "thigh_l", "shin_l"]
+const SLICE_SHADERS := ["skin", "cloth", "armor"]
+
+
+func _mesh_takes_slice(mi: MeshInstance3D) -> bool:
+	if mi.mesh == null:
+		return false
+	for i in mi.mesh.get_surface_count():
+		var m := mi.get_surface_override_material(i)
+		if m is ShaderMaterial and (m as ShaderMaterial).shader:
+			var path := (m as ShaderMaterial).shader.resource_path
+			for s in SLICE_SHADERS:
+				if path.ends_with(s + ".gdshader"):
+					return true
+	return false
+
+
+## Cuts `part` in two along a plane (world point + normal). The half beyond
+## the plane becomes a free body that takes all the children of the part with
+## it; the near half stays attached as a stump. Returns the far half.
+func slice(part: String, wpoint: Vector3, wnormal: Vector3, imp := Vector3.ZERO) -> RigidBody3D:
+	if not parts.has(part) or not joints.has(part) or severed.has(part) or not (part in SLICEABLE):
+		return null
+	_ensure_cap_meshes()
+	var rb: RigidBody3D = parts[part]
+	var xf := rb.global_transform
+	var pivot_l: Vector3 = -com[part]
+	var end_l: Vector3 = pivot_l + (Rig.end[part] - Rig.pivot[part]) * scale_factor
+	var p_l: Vector3 = xf.affine_inverse() * wpoint
+	var n_l: Vector3 = (xf.basis.transposed() * wnormal).normalized()
+	if n_l.dot(pivot_l - p_l) > 0.0:
+		n_l = -n_l        # the normal points to the far (distal) side
+	var denom := n_l.dot(end_l - pivot_l)
+	var t := 0.5 if absf(denom) < 1e-4 else clampf(n_l.dot(p_l - pivot_l) / denom, 0.25, 0.75)
+	var cut_l := pivot_l.lerp(end_l, t)
+	var r := _cap_radius(part) / 1.05
+	# far half
+	var chunk := RigidBody3D.new()
+	chunk.name = part + "_chunk"
+	chunk.top_level = true
+	chunk.mass = maxf(rb.mass * (1.0 - t), 0.2)
+	chunk.collision_layer = LAYER_DEAD
+	chunk.collision_mask = MASK_DEAD
+	chunk.physics_material_override = _phys_mat
+	chunk.linear_damp = 0.15
+	chunk.angular_damp = 0.9
+	add_child(chunk)
+	chunk.global_transform = xf
+	chunk.linear_velocity = rb.linear_velocity
+	chunk.angular_velocity = rb.angular_velocity
+	chunks.append(chunk)
+	var stump_shape: CollisionShape3D = null
+	for c in rb.get_children():
+		if c is CollisionShape3D:
+			stump_shape = c
+			break
+	_set_capsule(stump_shape, pivot_l, cut_l, r)
+	var cs := CollisionShape3D.new()
+	chunk.add_child(cs)
+	_set_capsule(cs, cut_l, end_l, r)
+	rb.mass = maxf(rb.mass * t, 0.3)
+	# meshes: sliceable ones are duplicated and clipped from opposite sides,
+	# the rest (hats, hair) go to whichever side their origin lies on
+	var keep: Array[MeshInstance3D] = []
+	var chunk_meshes: Array[MeshInstance3D] = []
+	for mi in part_meshes[part]:
+		if not is_instance_valid(mi):
+			continue
+		if _mesh_takes_slice(mi):
+			var dup := mi.duplicate() as MeshInstance3D
+			chunk.add_child(dup)
+			dup.transform = mi.transform
+			var bt: Basis = mi.transform.basis.transposed()
+			var n_m: Vector3 = bt * n_l
+			var d_m: float = n_l.dot(p_l - mi.transform.origin)
+			mi.set_instance_shader_parameter("slice_plane", Vector4(n_m.x, n_m.y, n_m.z, d_m))
+			dup.set_instance_shader_parameter("slice_plane", Vector4(-n_m.x, -n_m.y, -n_m.z, -d_m))
+			keep.append(mi)
+			chunk_meshes.append(dup)
+		elif n_l.dot(mi.transform.origin - p_l) > 0.0:
+			rb.remove_child(mi)
+			chunk.add_child(mi)
+			chunk_meshes.append(mi)
+		else:
+			keep.append(mi)
+	part_meshes[part] = keep
+	# every child joint now hangs from the far half
+	for c in Rig.children[part]:
+		if joints.has(c):
+			var j: Joint3D = joints[c]
+			j.node_a = j.get_path_to(chunk)
+		for p in Rig.subtree(c):
+			severed[p] = true
+			var crb: RigidBody3D = parts[p]
+			crb.collision_layer = LAYER_DEAD
+			crb.collision_mask = MASK_DEAD
+			crb.can_sleep = true
+			crb.linear_damp = 0.2
+			crb.angular_damp = 1.2
+			crb.freeze = false
+			crb.add_collision_exception_with(chunk)
+		joints.erase(c)
+	# the two halves may not collide with each other, nor the stump with the rest
+	chunk.add_collision_exception_with(rb)
+	for p in parts:
+		chunk.add_collision_exception_with(parts[p])
+	chunk.apply_central_impulse(imp)
+	chunk.apply_torque_impulse(Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * imp.length() * 0.05)
+	rb.apply_central_impulse(-imp * 0.15)
+	# the stump loses strength: it flops
+	part_strength[part] = minf(part_strength[part], 0.25)
+	part_sliced.emit(part, chunk, wpoint, xf.basis * n_l)
+	return chunk
+
+
+func _set_capsule(cs: CollisionShape3D, a: Vector3, b: Vector3, radius: float) -> void:
+	if cs == null:
+		return
+	var cap := CapsuleShape3D.new()
+	cap.radius = radius
+	cap.height = maxf((b - a).length() + radius * 2.0, radius * 2.02)
+	cs.shape = cap
+	cs.transform = Transform3D(_basis_y_to((b - a).normalized() if (b - a).length() > 1e-4 else Vector3.UP), (a + b) * 0.5)
+
+
+func _ensure_cap_meshes() -> void:
+	if _cap_mesh == null:
+		_cap_mesh = _make_cap_mesh()
+		_bone_mesh = CapsuleMesh.new()
+		_bone_mesh.radius = 0.5
+		_bone_mesh.height = 2.0
+
+
 func _cap_radius(part: String) -> float:
 	var s: Dictionary = Rig.shapes[part]
 	match s.type:
@@ -477,4 +614,8 @@ func cleanup_later(seconds: float) -> void:
 		for p in parts:
 			var rb: RigidBody3D = parts[p]
 			rb.freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
-			rb.freeze = true)
+			rb.freeze = true
+		for c in chunks:
+			if is_instance_valid(c):
+				c.freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
+				c.freeze = true)

@@ -122,6 +122,12 @@ func _define() -> void:
 	poses["die_head"] = {"setup": func() -> void:
 		_draw()
 		_kill("head"), "times": [0.3, 0.8, 1.6, 3.0]}
+	poses["die_arm"] = {"setup": func() -> void:
+		_draw()
+		_kill("forearm_r"), "times": [0.15, 0.5, 1.2, 2.5]}
+	poses["die_leg"] = {"setup": func() -> void:
+		_draw()
+		_kill("thigh_l"), "times": [0.15, 0.5, 1.2, 2.5]}
 	poses["die_chest"] = {"setup": func() -> void:
 		_draw()
 		_kill("chest"), "times": [0.3, 0.8, 1.6, 3.0]}
@@ -146,7 +152,7 @@ func _move(speed: float) -> void:
 
 func _kill(part: String) -> void:
 	var info := {"attacker": ch, "part": part, "point": ch.chest_position() + Vector3(0, 0.25 if part == "head" else -0.1, 0),
-		"dir": Vector3(-0.6, 0.1, 0.8).normalized(), "damage": 999.0, "power": 2.0, "cut": "horizontal"}
+		"dir": Vector3(-0.6, 0.1, 0.8).normalized(), "damage": 999.0, "power": 2.0, "cut": "horizontal", "blade": Vector3(0.3, 0.2, -0.9)}
 	ch.receive_hit(info)
 
 

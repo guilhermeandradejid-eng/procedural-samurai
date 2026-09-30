@@ -7,6 +7,10 @@ instance uniform vec4 blood_hit = vec4(0.0, 0.0, 0.0, 0.0);
 instance uniform float hit_flash = 0.0;
 instance uniform vec4 flash_color = vec4(1.0, 0.35, 0.25, 1.0);
 
+// Slicing: everything on the far side of the plane (mesh-local space) is
+// clipped; the inside of the cut shows through the back faces as raw flesh.
+instance uniform vec4 slice_plane = vec4(0.0);
+
 global uniform float wetness;
 
 varying vec3 v_local;
@@ -48,12 +52,33 @@ float blood_mask(vec3 p) {
 	return clamp(max(max(near_hit, drip * 0.9), spatter), 0.0, 1.0);
 }
 
+bool slice_clipped(vec3 p) {
+	return dot(slice_plane.xyz, slice_plane.xyz) > 0.01 && dot(p, slice_plane.xyz) > slice_plane.w;
+}
+
+void slice_interior(bool front, inout vec3 albedo, inout float rough, inout vec3 emission) {
+	if (front || dot(slice_plane.xyz, slice_plane.xyz) < 0.01) {
+		return;
+	}
+	float n = noise3(v_local * 35.0);
+	float m = noise3(v_local * 9.0);
+	// muscle fibres, pale fat rim, a dark blood pool in the middle
+	vec3 muscle = mix(vec3(0.2, 0.004, 0.008), vec3(0.42, 0.03, 0.03), n);
+	muscle = mix(muscle, vec3(0.55, 0.22, 0.2), smoothstep(0.66, 0.9, m) * 0.35);
+	albedo = muscle;
+	rough = 0.12;
+}
+
 void apply_character_fx(inout vec3 albedo, inout float rough, inout vec3 emission) {
 	float m = blood_mask(v_local);
 	vec3 blood_col = mix(vec3(0.33, 0.015, 0.015), vec3(0.18, 0.01, 0.01), noise3(v_local * 30.0));
 	albedo = mix(albedo, blood_col, m);
 	rough = mix(rough, 0.22, m);
-	albedo *= mix(1.0, 0.75, wetness);
-	rough = mix(rough, rough * 0.5, wetness);
+	// soaked: darker, clinging cloth, speckled with running droplets
+	float drops = smoothstep(0.78, 0.92, noise3(v_local * vec3(70.0, 16.0, 70.0) + vec3(0.0, TIME * 0.6, 0.0)));
+	albedo *= mix(1.0, 0.62, wetness);
+	rough = mix(rough, rough * 0.35, wetness);
+	rough = mix(rough, 0.05, drops * wetness);
+	albedo = mix(albedo, albedo * 1.35 + vec3(0.05), drops * wetness * 0.6);
 	emission += flash_color.rgb * hit_flash * 1.5;
 }

@@ -371,6 +371,37 @@ def thunder(seed):
     return normalize(fade(y, 0.002, 1.0), 0.9)
 
 
+def boing(seed):
+    """Cartoon spring: a sine whose pitch wobbles down as it decays."""
+    r = rng(seed)
+    dur = 0.9
+    t = t_axis(dur)
+    base = r.uniform(180, 240)
+    f = base * (1.0 + 1.1 * np.exp(-t / 0.35) * np.sin(2 * np.pi * (9.0 + 4.0 * np.exp(-t / 0.4)) * t + 0.6) * 0.5 + 0.8 * np.exp(-t / 0.18))
+    y = sine(f, dur) + 0.35 * sine(f * 2.01, dur) + 0.12 * sine(f * 3.0, dur)
+    y *= np.exp(-t / 0.32) * np.clip(t / 0.004, 0, 1)
+    return normalize(fade(y, 0.001, 0.15), 0.7)
+
+
+def squish(seed):
+    r = rng(seed)
+    dur = 0.5
+    t = t_axis(dur)
+    n = lowpass(white(dur, seed), 1400)
+    wob = 0.6 + 0.4 * np.sin(2 * np.pi * r.uniform(14, 22) * t)
+    y = n * wob * env_points(dur, [(0, 0), (0.02, 1.0), (0.2, 0.5), (dur, 0)])
+    y += sine(exp_glide(220, 70, dur), dur) * np.exp(-t / 0.08) * 0.5
+    return normalize(fade(y, 0.001, 0.1), 0.75)
+
+
+def pop(seed):
+    dur = 0.18
+    t = t_axis(dur)
+    y = sine(exp_glide(900, 120, dur), dur) * np.exp(-t / 0.03)
+    y += _strike(dur, seed, 800, 5000, 0.004) * 0.6
+    return normalize(fade(y, 0.0005, 0.05), 0.7)
+
+
 # name -> (generator, variations)
 SFX = {
     "swing": (swing, 5), "swing_heavy": (swing_heavy, 3), "clash": (clash, 4), "parry": (parry, 3),
@@ -381,5 +412,5 @@ SFX = {
     "perfect": (perfect, 1), "resolve": (resolve, 1), "heal": (heal, 1), "shrine_bell": (shrine_bell, 1),
     "banner": (banner, 1), "victory_sting": (victory_sting, 1), "ui_move": (ui_move, 1), "ui_select": (ui_select, 1),
     "map_open": (map_open, 1), "guiding_wind": (guiding_wind, 1), "blood_splat": (blood_splat, 3),
-    "thunder": (thunder, 2),
+    "thunder": (thunder, 2), "boing": (boing, 3), "squish": (squish, 3), "pop": (pop, 2),
 }

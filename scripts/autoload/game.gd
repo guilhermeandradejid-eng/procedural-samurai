@@ -13,6 +13,14 @@ signal detection_changed(enemy: Node, value: float)
 signal shake_requested(trauma: float)
 signal kill_cam_requested(target: Node3D, duration: float)
 signal hud_visibility(visible: bool)
+## Blood (or rain) landing on the camera lens; amount 0..1 and its colour.
+signal lens_splash(amount: float, color: Color)
+## Full-screen impact flash (parries, kills).
+signal screen_flash(color: Color, amount: float)
+
+
+func flash(color: Color, amount := 0.5) -> void:
+	screen_flash.emit(color, amount)
 
 enum State { LOADING, TITLE, PLAYING, PAUSED, DEAD, CUTSCENE }
 

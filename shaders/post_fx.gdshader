@@ -16,13 +16,51 @@ uniform float focus = 0.0;
 uniform float fade = 0.0;
 uniform vec3 fade_color : source_color = vec3(0.0);
 uniform float letterbox = 0.0;
+uniform vec4 flash_color : source_color = vec4(1.0);
+uniform float lens_rain = 0.0;
+uniform float lens_blood = 0.0;
+uniform vec3 lens_tint : source_color = vec3(0.5, 0.02, 0.02);
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
+// Droplets on the lens: xy = refraction offset, z = drop mask. Drops swell
+// and slowly slide down; `slip` speeds the slide (blood runs faster).
+vec3 lens_drops(vec2 uv, float aspect, float t, float seed, float cells, float size, float slip) {
+	vec2 p = uv * vec2(aspect, 1.0) * cells;
+	vec2 id = floor(p);
+	vec2 f = fract(p) - 0.5;
+	float h1 = hash(id + seed);
+	float h2 = hash(id * 1.7 + seed + 4.3);
+	float h3 = hash(id * 2.3 + seed + 9.1);
+	float life = fract(t * (0.02 + 0.03 * h2) * slip + h1);
+	float y_off = -smoothstep(0.55, 1.0, life) * 0.45;
+	vec2 c = vec2((h1 - 0.5) * 0.5, (h2 - 0.5) * 0.35 + y_off);
+	float r = size * (0.22 + 0.4 * h3) * (0.4 + 0.6 * smoothstep(0.0, 0.25, life));
+	vec2 q = (f - c) * vec2(1.0, 0.85);
+	float d = length(q);
+	float m = smoothstep(r, r * 0.55, d) * step(h3, 0.7);
+	// a thin streak above the drop while it slides
+	float streak = smoothstep(r * 0.35, 0.0, abs(f.x - c.x)) * step(c.y, f.y) * step(f.y, c.y + 0.35 * smoothstep(0.55, 0.8, life)) * 0.35 * step(h3, 0.7);
+	vec2 off = -(q / max(r, 1e-3)) * m;
+	return vec3(off, clamp(m + streak, 0.0, 1.0));
+}
+
 void fragment() {
 	vec2 uv = SCREEN_UV;
+	float aspect = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
+	vec3 wet = vec3(0.0);
+	vec3 gore = vec3(0.0);
+	if (lens_rain > 0.01) {
+		wet = lens_drops(uv, aspect, TIME, 1.0, 9.0, 0.36, 1.0) * lens_rain;
+		wet += lens_drops(uv, aspect, TIME, 7.0, 5.5, 0.42, 0.7) * lens_rain * 0.7;
+	}
+	if (lens_blood > 0.01) {
+		gore = lens_drops(uv, aspect, TIME, 3.0, 4.0, 0.55, 2.2) * lens_blood;
+		gore += lens_drops(uv, aspect, TIME, 11.0, 7.0, 0.4, 1.6) * lens_blood * 0.8;
+	}
+	uv += (wet.xy + gore.xy) * 0.03;
 	vec2 dc = uv - 0.5;
 	float r2 = dot(dc, dc);
 	vec3 col;
@@ -35,6 +73,9 @@ void fragment() {
 	} else {
 		col = texture(screen_tex, uv).rgb;
 	}
+	// lens water brightens at the edges; blood tints and darkens what is behind
+	col += vec3(0.9, 0.95, 1.0) * clamp(wet.z, 0.0, 1.0) * 0.06;
+	col = mix(col, lens_tint * (0.5 + 0.5 * col), clamp(gore.z, 0.0, 1.0) * 0.85);
 	float l = dot(col, vec3(0.299, 0.587, 0.114));
 	// low health / slow motion drain the colour (keeps the reds a bit)
 	float drain = max(low_health * 0.55, focus * 0.4);
@@ -62,5 +103,6 @@ void fragment() {
 	float bars = step(uv.y, letterbox * 0.12) + step(1.0 - letterbox * 0.12, uv.y);
 	col = mix(col, vec3(0.0), clamp(bars, 0.0, 1.0));
 	col = mix(col, fade_color, fade);
+	col = mix(col, flash_color.rgb, clamp(flash_color.a, 0.0, 1.0) * (1.0 - r2 * 0.6));
 	COLOR = vec4(col, 1.0);
 }

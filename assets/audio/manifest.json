@@ -30,6 +30,11 @@
    "sfx/body_fall_1.ogg",
    "sfx/body_fall_2.ogg"
   ],
+  "boing": [
+   "sfx/boing_0.ogg",
+   "sfx/boing_1.ogg",
+   "sfx/boing_2.ogg"
+  ],
   "charge": [
    "sfx/charge_0.ogg"
   ],
@@ -95,6 +100,10 @@
   "perfect": [
    "sfx/perfect_0.ogg"
   ],
+  "pop": [
+   "sfx/pop_0.ogg",
+   "sfx/pop_1.ogg"
+  ],
   "resolve": [
    "sfx/resolve_0.ogg"
   ],
@@ -109,6 +118,11 @@
   ],
   "shrine_bell": [
    "sfx/shrine_bell_0.ogg"
+  ],
+  "squish": [
+   "sfx/squish_0.ogg",
+   "sfx/squish_1.ogg",
+   "sfx/squish_2.ogg"
   ],
   "step": [
    "sfx/step_0.ogg",

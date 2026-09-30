@@ -315,6 +315,10 @@ wetness={
 "type": "float",
 "value": 0.0
 }
+rain_amount={
+"type": "float",
+"value": 0.0
+}
 snow_amount={
 "type": "float",
 "value": 0.0

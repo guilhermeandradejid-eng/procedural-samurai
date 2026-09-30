@@ -10,6 +10,12 @@ var leaves := {}        # kind -> GPUParticles3D
 var motes: GPUParticles3D
 var fireflies: GPUParticles3D
 var snow: GPUParticles3D
+var splash: GPUParticles3D
+var _splash_pm: ParticleProcessMaterial
+var _splash_img: Image
+var _splash_tex: ImageTexture
+var _splash_center := Vector2(INF, INF)
+const SPLASH_POINTS := 512
 var _timer := 0.0
 var _species := {"maple": 0.0, "ginkgo": 0.0, "sakura": 0.0}
 
@@ -22,7 +28,8 @@ func _ready() -> void:
 	motes = _make(160, 7.0, _glow_material(Color(1.6, 1.3, 0.8, 0.8)), _mote_process(), Vector2(0.03, 0.03), false)
 	fireflies = _make(70, 6.0, _glow_material(Color(2.2, 3.0, 1.2, 1.0)), _firefly_process(), Vector2(0.05, 0.05), false)
 	snow = _make(1500, 7.0, _glow_material(Color(1.0, 1.0, 1.0, 0.9), false), _snow_process(), Vector2(0.05, 0.05), false)
-	for p in [rain, motes, fireflies, snow]:
+	_make_splash()
+	for p in [rain, motes, fireflies, snow, splash]:
 		p.amount_ratio = 0.0
 	for k in leaves:
 		(leaves[k] as GPUParticles3D).amount_ratio = 0.0
@@ -46,6 +53,78 @@ func _make(amount: int, lifetime: float, mat: Material, pm: ParticleProcessMater
 		p.collision_base_size = 0.02
 	add_child(p)
 	return p
+
+
+## Ring-shaped splashes on the real ground: emission points are laid on the
+## terrain around the camera and refreshed as it moves.
+func _make_splash() -> void:
+	var gt := GradientTexture2D.new()
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0))
+	g.add_point(0.55, Color(1, 1, 1, 0))
+	g.add_point(0.8, Color(1, 1, 1, 1))
+	g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 64
+	gt.height = 64
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = gt
+	mat.albedo_color = Color(0.85, 0.9, 1.0, 0.45)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.vertex_color_use_as_albedo = true
+	_splash_pm = ParticleProcessMaterial.new()
+	_splash_pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_POINTS
+	_splash_pm.emission_point_count = SPLASH_POINTS
+	_splash_img = Image.create(SPLASH_POINTS, 1, false, Image.FORMAT_RGBF)
+	_splash_tex = ImageTexture.create_from_image(_splash_img)
+	_splash_pm.emission_point_texture = _splash_tex
+	_splash_pm.gravity = Vector3.ZERO
+	_splash_pm.initial_velocity_min = 0.0
+	_splash_pm.initial_velocity_max = 0.0
+	var sc := Curve.new()
+	sc.add_point(Vector2(0.0, 0.25))
+	sc.add_point(Vector2(1.0, 1.0))
+	var sct := CurveTexture.new()
+	sct.curve = sc
+	_splash_pm.scale_curve = sct
+	var col := Gradient.new()
+	col.set_color(0, Color(1, 1, 1, 0.9))
+	col.set_color(1, Color(1, 1, 1, 0.0))
+	var colt := GradientTexture1D.new()
+	colt.gradient = col
+	_splash_pm.color_ramp = colt
+	splash = GPUParticles3D.new()
+	splash.amount = 380
+	splash.lifetime = 0.42
+	splash.process_material = _splash_pm
+	var q := QuadMesh.new()
+	q.size = Vector2(0.34, 0.34)
+	q.orientation = PlaneMesh.FACE_Y
+	q.material = mat
+	splash.draw_pass_1 = q
+	splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	splash.visibility_aabb = AABB(Vector3(-40, -60, -40), Vector3(80, 120, 80))
+	splash.local_coords = false
+	add_child(splash)
+
+
+func _refresh_splash_points(c: Vector3, data: WorldData) -> void:
+	var cxz := Vector2(c.x, c.z)
+	if cxz.distance_to(_splash_center) < 5.0:
+		return
+	_splash_center = cxz
+	for i in SPLASH_POINTS:
+		var a := randf() * TAU
+		var r := sqrt(randf()) * 17.0
+		var x := c.x + cos(a) * r
+		var z := c.z + sin(a) * r
+		var y := data.get_height(x, z) + 0.03
+		_splash_img.set_pixel(i, 0, Color(x - c.x, y, z - c.z))
+	_splash_tex.update(_splash_img)
 
 
 # ------------------------------------------------------------------ materials
@@ -209,6 +288,7 @@ func _process(delta: float) -> void:
 	var c := cam.global_position
 	var wv := world.wind.vector3(1.0) if world.wind else Vector3.ZERO
 	rain.global_position = c + Vector3(0, 14, 0) - wv * 0.6
+	splash.global_position = Vector3(c.x, 0.0, c.z)
 	snow.global_position = c + Vector3(0, 10, 0) - wv * 2.0
 	for k in leaves:
 		(leaves[k] as GPUParticles3D).global_position = c + Vector3(0, 7, 0) - wv * 3.0
@@ -235,6 +315,10 @@ func _process(delta: float) -> void:
 	var windy := clampf(world.wind.strength / 1.5, 0.3, 1.5) if world.wind else 1.0
 	rain.amount_ratio = move_toward(rain.amount_ratio, target_rain, 0.2)
 	rain.emitting = rain.amount_ratio > 0.01
+	splash.amount_ratio = move_toward(splash.amount_ratio, target_rain, 0.2)
+	splash.emitting = splash.amount_ratio > 0.01
+	if splash.emitting:
+		_refresh_splash_points(c, world.data)
 	snow.amount_ratio = move_toward(snow.amount_ratio, target_snow, 0.1)
 	snow.emitting = snow.amount_ratio > 0.01
 	for k in leaves:

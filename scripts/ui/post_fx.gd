@@ -16,6 +16,10 @@ var fade_target := 0.0
 var fade_speed := 2.0
 var letterbox := 0.0
 var letterbox_target := 0.0
+var lens_blood := 0.0
+var lens_tint := Color(0.5, 0.02, 0.02)
+var lens_rain := 0.0
+var flash_color := Color(1, 1, 1, 0)
 
 
 func _ready() -> void:
@@ -32,6 +36,11 @@ func _ready() -> void:
 		damage = clampf(damage + 0.35 + amount / 60.0, 0.0, 1.0)
 		aberration = maxf(aberration, 0.012))
 	Game.shake_requested.connect(func(t: float) -> void: aberration = maxf(aberration, t * 0.018))
+	Game.screen_flash.connect(func(c: Color, amount: float) -> void:
+		flash_color = Color(c.r, c.g, c.b, maxf(flash_color.a, amount)))
+	Game.lens_splash.connect(func(amount: float, color: Color) -> void:
+		lens_blood = clampf(lens_blood + amount, 0.0, 1.2)
+		lens_tint = color)
 	kurosawa_on = bool(Settings.get_value("kurosawa", false))
 
 
@@ -72,6 +81,17 @@ func _process(delta: float) -> void:
 		low = clampf(1.0 - p.health / (p.max_health * 0.35), 0.0, 1.0)
 	elif p and p.dead:
 		low = 1.0
+	lens_blood = maxf(0.0, lens_blood - real * 0.16)
+	var world := Game.world as World
+	var rain_target := 0.0
+	if world and world.weather:
+		rain_target = world.weather.rain
+	lens_rain = lerpf(lens_rain, rain_target * 0.55, clampf(real * 0.5, 0.0, 1.0))
+	flash_color.a = maxf(0.0, flash_color.a - real * 4.5)
+	mat.set_shader_parameter("flash_color", flash_color)
+	mat.set_shader_parameter("lens_blood", lens_blood)
+	mat.set_shader_parameter("lens_tint", Vector3(lens_tint.r, lens_tint.g, lens_tint.b))
+	mat.set_shader_parameter("lens_rain", lens_rain)
 	mat.set_shader_parameter("damage", damage)
 	mat.set_shader_parameter("aberration", aberration)
 	mat.set_shader_parameter("focus", minf(focus, 1.0))

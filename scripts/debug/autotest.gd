@@ -26,6 +26,7 @@ func _ready() -> void:
 		out_dir = args[i + 1]
 	shots = args.has("shots")
 	DirAccess.make_dir_recursive_absolute(out_dir)
+	SaveGame.reset()   # every play-test starts from a clean save
 	if shots:
 		Settings.values.quality = 0
 		var w := Game.world as World

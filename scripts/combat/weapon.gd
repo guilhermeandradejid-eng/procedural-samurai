@@ -182,7 +182,8 @@ func tip() -> Vector3:
 	return global_transform * Vector3(0.0, float(data.get("blade_end", 0.75)), 0.0)
 
 
-func begin_sweep() -> void:
+func begin_sweep(color := Color(1.0, 0.97, 0.9, 0.9)) -> void:
+	trail.set_color(color)
 	sweeping = true
 	hit_set.clear()
 	_prev_pts = blade_points()

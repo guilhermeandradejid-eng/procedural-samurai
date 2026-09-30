@@ -166,6 +166,7 @@ func _become_suspicious(point: Vector3) -> void:
 		if action in ["sit", "kneel"]:
 			set_action("getup", 0.9)
 		Audio.play_at("huh", global_position + Vector3(0, 1.6, 0), -6.0, 0.15, 40.0)
+		FX.comic(global_position + Vector3(0, Rig.height() * scale_factor + 0.3, 0), "?", Color(1.0, 0.9, 0.2), 1.5)
 
 
 ## Switches to combat. `shout` alerts the rest of the encounter.
@@ -183,6 +184,7 @@ func become_aware(shout := true) -> void:
 		weapon.hold()
 	if shout:
 		Audio.play_at("alert_shout", global_position + Vector3(0, 1.6, 0), 0.0, 0.1, 60.0)
+		FX.comic(global_position + Vector3(0, Rig.height() * scale_factor + 0.3, 0), "!", Color(1.0, 0.2, 0.15), 1.7)
 		alerted.emit(self)
 	attack_cooldown = 0.8 + _rng.randf() * 1.2
 
@@ -424,6 +426,7 @@ func die(info: Dictionary) -> void:
 		last = (encounter as Encounter).alive().is_empty()
 	if last or info.get("attack", "") in ["iai", "assassinate"]:
 		Game.slowmo(1.5, 0.18)
+		Game.flash(Color(1.0, 0.85, 0.7), 0.3)
 		Game.kill_cam_requested.emit(self, 1.4)
 
 
@@ -434,6 +437,13 @@ func _on_part_severed(part: String, stump: String) -> void:
 		terrified = 999.0
 		state = State.FLEE
 		Audio.play_at("scream", global_position + Vector3(0, 1.6, 0), 2.0, 0.1)
+
+
+func _on_part_sliced(part: String, chunk: RigidBody3D, wpoint: Vector3, wnormal: Vector3) -> void:
+	super._on_part_sliced(part, chunk, wpoint, wnormal)
+	if not dead and (disarmed or crippled):
+		terrified = 999.0
+		state = State.FLEE
 
 
 func terrify(duration: float) -> void:

@@ -117,6 +117,7 @@ GLOBALS = [
     ("ambient_color", "color", "Color(0.4, 0.45, 0.55, 1)"),
     ("fog_color", "color", "Color(0.75, 0.7, 0.65, 1)"),
     ("wetness", "float", "0.0"),
+    ("rain_amount", "float", "0.0"),
     ("snow_amount", "float", "0.0"),
     ("terrain_info", "vec4", "Vector4(1024, 2, 1023, 0)"),
     ("terrain_height", "sampler2D", '""'),

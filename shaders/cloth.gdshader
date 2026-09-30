@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
 
 // Kimono / hakama cloth with procedural Japanese patterns (seigaiha waves,
 // asanoha, stripes) projected in the part's local space, fabric sheen,
@@ -33,6 +33,9 @@ float pat(vec2 uv) {
 }
 
 void fragment() {
+	if (slice_clipped(v_local)) {
+		discard;
+	}
 	vec3 n = normalize(v_local_n);
 	vec3 w = pow(abs(n), vec3(3.0));
 	w /= (w.x + w.y + w.z);
@@ -44,6 +47,7 @@ void fragment() {
 	float r = 0.82;
 	vec3 e = vec3(0.0);
 	apply_character_fx(c, r, e);
+	slice_interior(FRONT_FACING, c, r, e);
 	ALBEDO = c;
 	ROUGHNESS = r;
 	SPECULAR = 0.25;
