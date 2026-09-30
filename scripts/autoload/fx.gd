@@ -335,44 +335,12 @@ func sparks(pos: Vector3, dir: Vector3, strength := 1.0) -> void:
 	tw.tween_callback(light.queue_free)
 
 
-## Comic-book sound word popping out of a hit (TCHAC!, SPLAT!...).
-func comic(pos: Vector3, text: String, color := Color(1.0, 0.85, 0.2), size := 1.0) -> void:
-	if not bool(Settings.get_value("comic_text", true)):
-		return
-	var l := Label3D.new()
-	l.text = text
-	l.font = UIKit.font("title")
-	l.font_size = 72
-	l.pixel_size = 0.0022 * size
-	l.modulate = color
-	l.outline_modulate = Color(0.08, 0.02, 0.02)
-	l.outline_size = 16
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.no_depth_test = true
-	l.shaded = false
-	l.double_sided = true
-	l.render_priority = 10
-	_add(l)
-	l.global_position = pos
-	l.rotation.z = randf_range(-0.25, 0.25)
-	l.scale = Vector3.ONE * 0.2
-	var tw := l.create_tween().set_parallel(true)
-	tw.tween_property(l, "scale", Vector3.ONE * 1.25, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "position:y", pos.y + 0.6, 1.1).set_ease(Tween.EASE_OUT)
-	tw.chain().tween_property(l, "modulate:a", 0.0, 0.35).set_delay(0.45)
-	tw.tween_callback(l.queue_free)
-
-
-## The red 危 that warns of a perilous (unblockable) attack.
+## Red warning triangle that flashes above an enemy about to land a perilous
+## (unblockable) attack; a symbol instead of text so it reads in any language.
 func peril(pos: Vector3) -> void:
-	var l := Label3D.new()
-	l.text = "危"
-	l.font = UIKit.font("kanji")
-	l.font_size = 128
-	l.pixel_size = 0.0045
-	l.modulate = Color(1.0, 0.12, 0.08)
-	l.outline_modulate = Color(0.1, 0.0, 0.0)
-	l.outline_size = 14
+	var l := Sprite3D.new()
+	l.texture = _peril_texture()
+	l.pixel_size = 0.0055
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
 	l.shaded = false
@@ -381,10 +349,47 @@ func peril(pos: Vector3) -> void:
 	l.global_position = pos
 	l.scale = Vector3.ONE * 0.3
 	var tw := l.create_tween().set_parallel(true)
-	tw.tween_property(l, "scale", Vector3.ONE * 1.3, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.25).set_delay(0.55)
+	tw.tween_property(l, "scale", Vector3.ONE * 1.15, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 0.2).set_delay(0.5)
 	tw.chain().tween_callback(l.queue_free)
 	shockwave(pos, Color(1.0, 0.15, 0.1), 0.8)
+
+
+var _peril_tex: Texture2D
+
+
+func _peril_texture() -> Texture2D:
+	if _peril_tex != null:
+		return _peril_tex
+	var n := 96
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var pts := [Vector2(n * 0.5, 6.0), Vector2(n - 5.0, n - 12.0), Vector2(5.0, n - 12.0)]
+	var centroid: Vector2 = (pts[0] + pts[1] + pts[2]) / 3.0
+	for y in n:
+		for x in n:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var m := 1e9
+			for k in 3:
+				var a: Vector2 = pts[k]
+				var b: Vector2 = pts[(k + 1) % 3]
+				var e := (b - a).normalized()
+				var nrm := Vector2(-e.y, e.x)
+				if nrm.dot(centroid - a) < 0.0:
+					nrm = -nrm
+				m = minf(m, nrm.dot(p - a))
+			if m <= 0.0:
+				continue
+			var col := Color(0.1, 0.0, 0.0, 1.0) if m < 5.0 else Color(0.95, 0.1, 0.06, 1.0)
+			# exclamation mark
+			var bar := absf(p.x - n * 0.5) < 5.0 and p.y > 34.0 and p.y < 62.0
+			var dot := p.distance_to(Vector2(n * 0.5, 71.0)) < 6.0
+			if bar or dot:
+				col = Color(1, 1, 1, 1)
+			col.a = clampf(m / 1.5, 0.0, 1.0)
+			img.set_pixel(x, y, col)
+	_peril_tex = ImageTexture.create_from_image(img)
+	return _peril_tex
 
 
 ## Onimusha-style souls: glowing orbs pour out of a fallen enemy and stream

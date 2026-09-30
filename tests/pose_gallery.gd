@@ -71,18 +71,18 @@ func _define() -> void:
 	var fwd := Vector3(0, 0, -1)
 	poses["idle"] = {"setup": func() -> void: ch.weapon_drawn = false, "times": [0.5, 1.5]}
 	poses["idle_combat"] = {"setup": func() -> void: _draw(), "times": [0.6, 1.6]}
-	poses["walk"] = {"setup": func() -> void: _move(2.1), "times": [1.0, 1.25, 1.5, 1.75]}
-	poses["run"] = {"setup": func() -> void: _move(5.2), "times": [1.0, 1.15, 1.3, 1.45]}
+	poses["walk"] = {"setup": func() -> void: _move(1.4), "times": [1.0, 1.25, 1.5, 1.75]}
+	poses["run"] = {"setup": func() -> void: _move(3.9), "times": [1.0, 1.15, 1.3, 1.45]}
 	poses["run_sword"] = {"setup": func() -> void:
 		_draw()
-		_move(5.2), "times": [1.0, 1.15, 1.3, 1.45]}
+		_move(3.9), "times": [1.0, 1.15, 1.3, 1.45]}
 	poses["sprint"] = {"setup": func() -> void:
 		_draw()
 		ch.sprinting = true
-		_move(7.8), "times": [1.0, 1.1, 1.2, 1.3]}
+		_move(5.7), "times": [1.0, 1.1, 1.2, 1.3]}
 	poses["crouch"] = {"setup": func() -> void:
 		ch.crouching = true
-		_move(1.9), "times": [1.0, 1.3]}
+		_move(1.2), "times": [1.0, 1.3]}
 	for a in ["light_1", "light_2", "light_3", "heavy", "counter", "iai", "assassinate"]:
 		poses[a] = {"setup": func() -> void:
 			_draw()

@@ -427,7 +427,6 @@ func break_posture(dir: Vector3) -> void:
 	posture_broken = 2.4
 	stagger(dir, 1.4, 2.4)
 	FX.shockwave(chest_position(), Color(1.0, 0.85, 0.5), 1.3)
-	FX.comic(chest_position() + Vector3(0, 0.5, 0), ["CRAC!", "POSTURA!", "TILT!"][randi() % 3], Color(1.0, 0.9, 0.4), 1.2)
 	Audio.play_at("guard_break", chest_position(), 3.0)
 
 
@@ -564,7 +563,6 @@ func receive_hit(info: Dictionary) -> String:
 			return "parried"
 		guard -= float(info.get("guard_damage", 10.0))
 		FX.sparks(point, -dir, 1.0)
-		FX.comic(point + Vector3(0, 0.3, 0), ["CLANG!", "TANG!", "CLONC!"][randi() % 3], Color(0.85, 0.9, 1.0), 0.9)
 		Audio.play_at("clash", point, 0.0, 0.1)
 		Game.shake(0.25)
 		Game.hitstop(0.05)
@@ -584,7 +582,6 @@ func receive_hit(info: Dictionary) -> String:
 		info.power = 3.0
 		info.deathblow = true
 		posture_broken = 0.0
-		Game.kanji("死", Color(0.85, 0.05, 0.04), 1.0)
 		Game.flash(Color(0.9, 0.05, 0.03), 0.5)
 		Game.slowmo(1.2, 0.14)
 		Audio.play("deathblow", 0.0)
@@ -602,7 +599,6 @@ func receive_hit(info: Dictionary) -> String:
 		body.weaken(part, 0.1)
 		Audio.play_at("flesh_cut", point, 0.0, 0.1)
 		Game.hitstop(float(info.get("hitstop", 0.06)))
-		FX.comic(point + Vector3(0, 0.25, 0), HIT_WORDS[randi() % HIT_WORDS.size()], Color(1.0, 0.82, 0.15), 0.9 + 0.15 * power)
 		FX.shockwave(point, Color(1.0, 0.5, 0.3), 0.5 + 0.2 * power)
 		_lens_hit(point)
 	if health <= 0.0:
@@ -623,8 +619,6 @@ func receive_hit(info: Dictionary) -> String:
 	return "hit"
 
 
-const HIT_WORDS := ["TCHAC!", "SHLASH!", "PLAFT!", "SPLOSH!", "ZAP!", "TCHUM!"]
-const SLICE_WORDS := ["SHLUNK!", "FATIA!", "SCHLUP!", "TCHAU!", "SPLASH!"]
 
 
 func _lens_hit(point: Vector3) -> void:
@@ -672,14 +666,12 @@ func _on_part_sliced(part: String, chunk: RigidBody3D, wpoint: Vector3, wnormal:
 	FX.stump_fountain(rb, rb.global_transform.affine_inverse() * wpoint, rb.global_basis.inverse() * wnormal, 3.5)
 	FX.stump_fountain(chunk, chunk.global_transform.affine_inverse() * wpoint, chunk.global_basis.inverse() * -wnormal, 2.4)
 	FX.blood_burst(wpoint, wnormal, 2.0)
-	FX.comic(wpoint + Vector3(0, 0.4, 0), SLICE_WORDS[randi() % SLICE_WORDS.size()], Color(1.0, 0.25, 0.2), 1.3)
 	FX.shockwave(wpoint, Color(1.0, 0.3, 0.2), 0.9)
 	Audio.play_at("dismember", wpoint, 3.0)
 	Audio.play_at("squish", wpoint, 0.0, 0.1)
 	get_tree().create_timer(0.55).timeout.connect(func() -> void:
 		if is_instance_valid(chunk):
-			Audio.play_at("boing", chunk.global_position, -2.0, 0.15)
-			FX.comic(chunk.global_position + Vector3(0, 0.3, 0), "BOING!", Color(0.6, 1.0, 0.5), 0.8))
+			Audio.play_at("boing", chunk.global_position, -2.0, 0.15))
 	Game.shake(0.5)
 	Game.hitstop(0.1)
 	var cam := get_viewport().get_camera_3d()
@@ -715,7 +707,6 @@ func _slam() -> void:
 	FX.dust(tip, 2.4)
 	FX.sparks(tip, Vector3.UP, 1.2)
 	FX.shockwave(tip + Vector3(0, 0.15, 0), Color(1.0, 0.85, 0.55), 1.5)
-	FX.comic(tip + Vector3(0, 0.5, 0), ["BAM!", "TOC!", "KRAK!"][randi() % 3], Color(1.0, 0.7, 0.2), 1.3)
 	Audio.play_at("land", tip, 4.0)
 	Game.shake(0.4)
 
@@ -749,7 +740,6 @@ func _on_parried(info: Dictionary) -> void:
 	var point: Vector3 = info.get("point", global_position)
 	FX.sparks(point, -(info.get("dir", Vector3.FORWARD) as Vector3), 3.4)
 	FX.shockwave(point, Color(1.0, 0.95, 0.75), 1.9)
-	FX.comic(point + Vector3(0, 0.35, 0), ["PARRY!", "TING!", "TANG!!"][randi() % 3], Color(1.0, 0.95, 0.6), 1.25)
 	Game.flash(Color(1.0, 0.97, 0.9), 0.55)
 	Audio.play_at("parry", point, 3.0)
 	Game.hitstop(0.12)
@@ -849,7 +839,6 @@ func _on_part_severed(part: String, stump: String) -> void:
 	FX.stump_fountain(body.parts[stump], body.parts[stump].global_transform.affine_inverse() * rb.global_position, body.parts[stump].global_basis.inverse() * (global_basis * dir), 2.8)
 	FX.stump_fountain(rb, Vector3.ZERO, -(Rig.end[part] - Rig.pivot[part]).normalized(), 1.6)
 	FX.blood_burst(rb.global_position, global_basis * dir, 2.2)
-	FX.comic(rb.global_position + Vector3(0, 0.35, 0), "PLOFT!" if part == "head" else SLICE_WORDS[randi() % SLICE_WORDS.size()], Color(1.0, 0.25, 0.2), 1.25)
 	FX.shockwave(rb.global_position, Color(1.0, 0.3, 0.2), 0.9)
 	var cam := get_viewport().get_camera_3d()
 	if cam and cam.global_position.distance_to(rb.global_position) < 4.5:
@@ -862,8 +851,7 @@ func _on_part_severed(part: String, stump: String) -> void:
 		rb.physics_material_override = bouncy
 		get_tree().create_timer(0.7).timeout.connect(func() -> void:
 			if is_instance_valid(rb):
-				Audio.play_at("boing", rb.global_position, -1.0, 0.15)
-				FX.comic(rb.global_position + Vector3(0, 0.3, 0), "BOING!", Color(0.6, 1.0, 0.5), 0.9))
+				Audio.play_at("boing", rb.global_position, -1.0, 0.15))
 	Audio.play_at("dismember", rb.global_position, 3.0)
 	Audio.play_at("squish", rb.global_position, 0.0, 0.1)
 	Game.shake(0.45)

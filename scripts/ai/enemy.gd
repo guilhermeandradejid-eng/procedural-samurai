@@ -167,7 +167,6 @@ func _become_suspicious(point: Vector3) -> void:
 		if action in ["sit", "kneel"]:
 			set_action("getup", 0.9)
 		Audio.play_at("huh", global_position + Vector3(0, 1.6, 0), -6.0, 0.15, 40.0)
-		FX.comic(global_position + Vector3(0, Rig.height() * scale_factor + 0.3, 0), "?", Color(1.0, 0.9, 0.2), 1.5)
 
 
 ## Switches to combat. `shout` alerts the rest of the encounter.
@@ -185,7 +184,6 @@ func become_aware(shout := true) -> void:
 		weapon.hold()
 	if shout:
 		Audio.play_at("alert_shout", global_position + Vector3(0, 1.6, 0), 0.0, 0.1, 60.0)
-		FX.comic(global_position + Vector3(0, Rig.height() * scale_factor + 0.3, 0), "!", Color(1.0, 0.2, 0.15), 1.7)
 		alerted.emit(self)
 	attack_cooldown = 0.8 + _rng.randf() * 1.2
 

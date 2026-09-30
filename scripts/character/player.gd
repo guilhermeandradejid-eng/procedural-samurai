@@ -7,11 +7,11 @@ extends Character
 signal resolve_changed(value: int, charge: float)
 signal perfect_move(kind: String)
 
-const WALK := 2.1
-const RUN := 5.2
-const SPRINT := 7.8
-const CROUCH := 1.9
-const COMBAT_SPEED := 3.6
+const WALK := 1.4
+const RUN := 3.9
+const SPRINT := 5.7
+const CROUCH := 1.2
+const COMBAT_SPEED := 2.5
 const JUMP := 6.0
 const BUFFER := 0.3
 
@@ -249,8 +249,6 @@ func _on_dodged(info: Dictionary) -> void:
 		# Sekiro's mikiri: dodging a perilous thrust puts the attacker off balance
 		var att: Character = info.get("attacker", null)
 		if att and info.get("attack", "") == "thrust" and info.get("unblockable", false):
-			Game.kanji("見切", Color(0.95, 0.85, 0.4), 1.0)
-			FX.comic(att.chest_position() + Vector3(0, 0.5, 0), "MIKIRI!", Color(1.0, 0.9, 0.3), 1.3)
 			att.guard -= 70.0
 			att.break_posture((att.global_position - global_position).normalized())
 
@@ -272,7 +270,6 @@ func _on_parried(info: Dictionary) -> void:
 
 
 func _issen(att: Character) -> void:
-	Game.kanji("一閃", Color(1.0, 1.0, 1.0), 1.3)
 	Game.flash(Color(1, 1, 1), 0.9)
 	Game.kurosawa_pulse.emit(1.2)
 	Game.slowmo(1.7, 0.1)

@@ -45,6 +45,15 @@ func _build_views() -> void:
 		var c := Vector3(lk.x, float(lk.level), lk.z)
 		_add("lake", c + Vector3(float(lk.radius) * 1.3, 8.0, 40.0), c)
 	_add("coast", Vector3(60, 12, 760), Vector3(60, 0, 1000))
+	var w := Game.world as World
+	if w != null and w.time_of_day != null:
+		# look straight at the sun and at the moon to check their exposure
+		var tod := w.time_of_day
+		var eye := s + Vector3(0, 2.0, 0)
+		_add("sun", eye, eye + tod.sun_direction(tod.time) * 200.0)
+		_add("moon", eye, eye + tod.moon_direction(tod.time) * 200.0)
+		# ground lit by the sun / moon light
+		_add("ground_lit", eye, eye + Vector3(20, -1.0, -30) * 1.0)
 	if not only.is_empty():
 		views = views.filter(func(v): return v.name in only)
 

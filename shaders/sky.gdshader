@@ -19,8 +19,8 @@ uniform vec3 night_horizon : source_color = vec3(0.045, 0.065, 0.12);
 uniform vec3 ground_color : source_color = vec3(0.16, 0.15, 0.14);
 uniform float sky_energy = 1.0;
 uniform float sun_disc_size = 0.9994;
-uniform float sun_disc_energy = 38.0;
-uniform float mie_strength = 0.4;
+uniform float sun_disc_energy = 9.0;
+uniform float mie_strength = 0.32;
 
 uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable;
 uniform sampler2D cloud_detail : filter_linear_mipmap, repeat_enable;
@@ -96,7 +96,7 @@ void sky() {
 
 	// Mie halo around the sun + sun shafts fanning through the haze
 	float cosang = dot(dir, sun);
-	float mie = pow(max(cosang, 0.0), 12.0) * 0.5 + pow(max(cosang, 0.0), 180.0) * 2.0;
+	float mie = pow(max(cosang, 0.0), 12.0) * 0.4 + pow(max(cosang, 0.0), 180.0) * 0.8;
 	vec3 sun_col = LIGHT0_ENABLED ? LIGHT0_COLOR : vec3(1.0);
 	col += sun_col * mie * mie_strength * (0.4 + 0.6 * day) * step(-0.25, sun_y);
 	{
@@ -155,7 +155,7 @@ void sky() {
 		float curtain = sin(az * 5.0 + TIME * 0.15 + texture(cloud_noise, vec2(az * 0.6, TIME * 0.004)).r * 4.0) * 0.5 + 0.5;
 		float ay = smoothstep(0.08, 0.22, dir.y) * smoothstep(0.62, 0.3, dir.y);
 		float aur = curtain * curtain * ay * smoothstep(-0.2, 0.9, -dir.z);
-		col += mix(vec3(0.1, 0.9, 0.5), vec3(0.5, 0.25, 0.9), smoothstep(0.25, 0.55, dir.y)) * aur * clear * 0.16;
+		col += mix(vec3(0.1, 0.9, 0.5), vec3(0.5, 0.25, 0.9), smoothstep(0.25, 0.55, dir.y)) * aur * clear * 0.08;
 	}
 	if (LIGHT1_ENABLED) {
 		vec3 md = LIGHT1_DIRECTION;
@@ -169,10 +169,10 @@ void sky() {
 			float maria = smoothstep(0.35, 0.65, texture(cloud_noise, mp * 0.25 + 0.5).r);
 			float lit = smoothstep(moon_phase - 0.25, moon_phase + 0.25, mp.x);
 			vec3 mcol = mix(vec3(0.95, 0.96, 1.0), vec3(0.55, 0.58, 0.68), maria * 0.7) * (0.75 + craters * 0.35);
-			col += mcol * disc * 4.2 * night * mix(0.06, 1.0, lit);
+			col += mcol * disc * 1.25 * night * mix(0.05, 1.0, lit);
 		}
-		col += vec3(0.35, 0.4, 0.55) * pow(max(mc, 0.0), 60.0) * 0.45 * night;
-		col += vec3(0.2, 0.25, 0.4) * pow(max(mc, 0.0), 9.0) * 0.12 * night;
+		col += vec3(0.3, 0.36, 0.52) * pow(max(mc, 0.0), 120.0) * 0.16 * night;
+		col += vec3(0.16, 0.2, 0.34) * pow(max(mc, 0.0), 14.0) * 0.045 * night;
 	}
 
 	// sun disc (hidden by clouds below)
@@ -196,7 +196,8 @@ void sky() {
 		float lit = exp(-tau * 0.85 * (0.6 + dens));
 		float powder = 1.0 - exp(-dens * 3.0);
 		float silver = pow(max(cosang, 0.0), 5.0) * (1.0 - dens * 0.7) * 2.2;
-		vec3 lit_col = sun_col * cloud_lit_tint * (0.3 + 1.2 * day) + sunset_glow * sunset * 0.7 * pow(toward, 2.0);
+		vec3 moon_lit = (LIGHT1_ENABLED ? LIGHT1_COLOR : vec3(0.5, 0.6, 0.95)) * 0.11 * night;
+		vec3 lit_col = sun_col * cloud_lit_tint * (0.3 + 1.2 * day) * smoothstep(-0.12, 0.05, sun_y) + moon_lit + sunset_glow * sunset * 0.7 * pow(toward, 2.0);
 		vec3 shade_col = mix(hor, zen, 0.45) * cloud_shadow_tint * (0.45 + 0.55 * day) + vec3(0.018, 0.022, 0.04) * night;
 		// sunset paints the undersides with the horizon colour
 		shade_col = mix(shade_col, sunset_horizon * 0.55, sunset * 0.45 * (1.0 - up));
@@ -208,10 +209,10 @@ void sky() {
 		cloud_a = clamp(dens * cloud_density, 0.0, 1.0) * horizon_fade;
 
 		// high cirrus deck, streaked by the wind, blushing at sunset
-		float ci = cirrus_field(dir.xz / (dir.y + 0.35) * 0.55 + drift * 2.5, normalize(wind_dir + vec2(1e-4)), 0.5 * (1.0 - storm)) * smoothstep(0.03, 0.4, dir.y);
+		float ci = cirrus_field(dir.xz / (dir.y + 0.35) * 0.55 + drift * 2.5, normalize(wind_dir + vec2(1e-4)), 0.34 * (1.0 - storm)) * smoothstep(0.03, 0.4, dir.y);
 		vec3 ci_col = mix(vec3(0.85, 0.9, 1.0) * (0.4 + 0.8 * day), sunset_horizon * 1.3, sunset * pow(toward, 1.5)) + sun_col * silver * 0.08 * day;
 		ci_col += vec3(0.02, 0.03, 0.06) * night;
-		float ci_a = ci * 0.4 * (1.0 - cloud_a * 0.7);
+		float ci_a = ci * 0.3 * (1.0 - cloud_a * 0.7);
 		cloud_col = mix(cloud_col, ci_col, ci_a / max(ci_a + cloud_a, 1e-3) * step(cloud_a, 0.999));
 		cloud_a = clamp(cloud_a + ci_a, 0.0, 1.0);
 	}

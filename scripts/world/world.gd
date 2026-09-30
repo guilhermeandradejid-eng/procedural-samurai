@@ -63,6 +63,7 @@ func build() -> void:
 	lightning_light.name = "LightningLight"
 	lightning_light.light_color = Color(0.75, 0.82, 1.0)
 	lightning_light.light_energy = 0.0
+	lightning_light.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	lightning_light.shadow_enabled = true
 	lightning_light.light_volumetric_fog_energy = 3.0
 	lightning_light.directional_shadow_max_distance = 120.0
@@ -131,10 +132,10 @@ func _build_environment() -> void:
 	env.tonemap_agx_contrast = 1.18
 	env.tonemap_exposure = 1.0
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
+	env.glow_intensity = 0.4
 	env.glow_strength = 1.0
 	env.glow_bloom = 0.06
-	env.glow_hdr_threshold = 1.1
+	env.glow_hdr_threshold = 1.7
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.set("glow_levels/1", 0.0)
 	env.set("glow_levels/2", 0.6)
@@ -179,13 +180,13 @@ func _build_environment() -> void:
 	sun.directional_shadow_split_3 = 0.42
 	sun.directional_shadow_blend_splits = true
 	sun.light_angular_distance = 0.6
-	sun.light_volumetric_fog_energy = 1.6
+	sun.light_volumetric_fog_energy = 1.0
 	add_child(sun)
 	moon = DirectionalLight3D.new()
 	moon.name = "Moon"
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 120.0
-	moon.light_volumetric_fog_energy = 2.5
+	moon.light_volumetric_fog_energy = 0.7
 	add_child(moon)
 
 	wind = Wind.new()

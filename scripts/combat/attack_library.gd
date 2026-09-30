@@ -8,7 +8,7 @@ extends RefCounted
 
 ## Weapon-specific data: resting guard pose, reach and hand placement.
 const WEAPONS := {
-	"katana": {"left_hand": -0.16, "reach": 1.0, "ideal": 1.05, "blade_start": 0.05, "blade_end": 0.75, "guard": "guard_katana", "two_handed": true, "mass": 1.2},
+	"katana": {"left_hand": -0.11, "reach": 1.0, "ideal": 1.05, "blade_start": 0.05, "blade_end": 0.75, "guard": "guard_katana", "two_handed": true, "mass": 1.2},
 	"nodachi": {"left_hand": -0.26, "reach": 1.4, "ideal": 1.35, "blade_start": 0.05, "blade_end": 1.12, "guard": "guard_katana", "two_handed": true, "mass": 2.4},
 	"kanabo": {"left_hand": -0.2, "reach": 1.2, "ideal": 1.2, "blade_start": 0.2, "blade_end": 0.95, "guard": "guard_kanabo", "two_handed": true, "mass": 4.0},
 	"yari": {"left_hand": 0.55, "reach": 2.2, "ideal": 1.9, "blade_start": 1.25, "blade_end": 1.64, "guard": "guard_yari", "two_handed": true, "mass": 2.0},
@@ -16,8 +16,8 @@ const WEAPONS := {
 
 ## Hip of the chibi body (torso is 1.32x wider than the human reference the
 ## keyframes were authored for; the animator adds the vertical shift to all keys).
-const SHEATH_GRIP := Vector3(-0.25, 0.99, -0.21)
-const SHEATH_DIR := Vector3(0.12, -0.32, 0.94)
+const SHEATH_GRIP := Vector3(-0.12, 1.08, -0.26)
+const SHEATH_DIR := Vector3(-0.25, -0.3, 0.92)
 
 static var _cache := {}
 
@@ -44,7 +44,7 @@ static func guard(weapon: String) -> Dictionary:
 		"yari":
 			return key(0.0, Vector3(0.14, 1.02, 0.12), Vector3(-0.05, 0.28, -0.96), Vector3(0, 1, 0))
 		_:
-			return key(0.0, Vector3(0.08, 1.08, -0.3), Vector3(0.0, 0.55, -0.83), Vector3(0.0, -0.83, -0.55))
+			return key(0.0, Vector3(0.02, 1.2727, -0.24), Vector3(0.0, 0.5, -0.86), Vector3(0.0, -0.86, -0.5))
 
 
 static func block_pose(weapon: String) -> Dictionary:
@@ -52,7 +52,7 @@ static func block_pose(weapon: String) -> Dictionary:
 		"yari":
 			return key(0.0, Vector3(0.25, 1.3, -0.25), Vector3(-0.95, 0.25, -0.1), Vector3(0, 0.3, -1))
 		_:
-			return key(0.0, Vector3(0.16, 1.42, -0.32), Vector3(-0.92, 0.3, -0.22), Vector3(0.0, 0.25, -0.97))
+			return key(0.0, Vector3(0.05, 1.4327, -0.22), Vector3(-0.6, 0.75, -0.28), Vector3(0.0, 0.3, -0.95))
 
 
 ## Sheathed position of the grip (hand on the hilt at the left hip).
@@ -75,7 +75,7 @@ static func _build() -> void:
 	# holds a beat and settles back into the guard. Times are seconds; the key
 	# "ease" describes how the motion arrives at that key.
 	_cache["light_1"] = {   # yoko-giri: quick horizontal slash, right to left
-		"name": "light_1", "duration": 0.62, "active": [0.17, 0.31], "damage": 18.0, "guard_damage": 12.0,
+		"name": "light_1", "clip": "katana_light_1", "duration": 0.62, "active": [0.17, 0.31], "damage": 18.0, "guard_damage": 12.0,
 		"step": 0.55, "step_window": [0.06, 0.24], "cancel": 0.38, "swing_time": 0.15, "hitstop": 0.06,
 		"cut": "horizontal", "next": "light_2", "power": 1.0,
 		"keys": [g,
@@ -88,7 +88,7 @@ static func _build() -> void:
 			key(0.62, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["light_2"] = {   # kesa-giri: rises high on the left, diagonal cut down to the right
-		"name": "light_2", "duration": 0.68, "active": [0.18, 0.34], "damage": 20.0, "guard_damage": 14.0,
+		"name": "light_2", "clip": "katana_light_2", "duration": 0.68, "active": [0.18, 0.34], "damage": 20.0, "guard_damage": 14.0,
 		"step": 0.6, "step_window": [0.08, 0.27], "cancel": 0.4, "swing_time": 0.16, "hitstop": 0.065,
 		"cut": "diagonal_down", "next": "light_3", "power": 1.05,
 		"keys": [g,
@@ -101,7 +101,7 @@ static func _build() -> void:
 			key(0.68, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["light_3"] = {   # kaiten-zan: a low coil then a spinning slash all the way round (Onimusha flourish)
-		"name": "light_3", "duration": 0.86, "active": [0.2, 0.46], "damage": 26.0, "guard_damage": 24.0,
+		"name": "light_3", "clip": "katana_light_3", "duration": 0.86, "active": [0.2, 0.46], "damage": 26.0, "guard_damage": 24.0,
 		"step": 0.75, "step_window": [0.1, 0.34], "cancel": 0.6, "swing_time": 0.2, "hitstop": 0.085,
 		"cut": "horizontal", "next": "light_1", "power": 1.35, "spin": [0.16, 0.46, 330.0], "wide": true,
 		"keys": [g,
@@ -113,12 +113,12 @@ static func _build() -> void:
 			key(0.86, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["heavy_charge"] = {
-		"name": "heavy_charge", "duration": 0.3, "hold": true,
+		"name": "heavy_charge", "clip": "katana_heavy_charge", "duration": 0.3, "hold": true,
 		"keys": [g, key(0.3, Vector3(0.14, 1.62, 0.1), Vector3(0.28, 0.4, 0.87), Vector3(0.0, 0.9, -0.42), 18.0, -6.0, 0.08, "out")],
 	}
 	var charged := key(0.0, Vector3(0.14, 1.66, 0.12), Vector3(0.28, 0.4, 0.87), Vector3(0.0, 0.9, -0.42), 18.0, -8.0, 0.1)
 	_cache["heavy"] = {   # ichimonji: the sword crashes down from above the head, sticking in the ground
-		"name": "heavy", "duration": 0.78, "active": [0.07, 0.24], "damage": 38.0, "guard_damage": 70.0,
+		"name": "heavy", "clip": "katana_heavy", "duration": 0.78, "active": [0.07, 0.24], "damage": 38.0, "guard_damage": 70.0,
 		"step": 1.4, "step_window": [0.0, 0.2], "cancel": 0.58, "swing_time": 0.05, "hitstop": 0.13,
 		"cut": "diagonal_down", "unblockable": false, "breaks_guard": true, "power": 1.9, "slam": true,
 		"keys": [charged,
@@ -130,7 +130,7 @@ static func _build() -> void:
 			key(0.78, g.pos, g.dir, g.edge, 0.0, 0.0, 0.0, "inout")],
 	}
 	_cache["counter"] = {   # answer after a deflect: a fast rising diagonal
-		"name": "counter", "duration": 0.5, "active": [0.08, 0.23], "damage": 34.0, "guard_damage": 40.0,
+		"name": "counter", "clip": "katana_counter", "duration": 0.5, "active": [0.08, 0.23], "damage": 34.0, "guard_damage": 40.0,
 		"step": 0.85, "step_window": [0.0, 0.16], "cancel": 0.34, "swing_time": 0.06, "hitstop": 0.1,
 		"cut": "diagonal_up", "power": 1.65,
 		"keys": [g,
@@ -142,7 +142,7 @@ static func _build() -> void:
 	}
 	var hilt := hilt_pose()
 	_cache["iai"] = {
-		"name": "iai", "duration": 0.62, "active": [0.05, 0.2], "damage": 999.0, "guard_damage": 999.0,
+		"name": "iai", "clip": "katana_iai", "duration": 0.62, "active": [0.05, 0.2], "damage": 999.0, "guard_damage": 999.0,
 		"step": 3.2, "step_window": [0.0, 0.16], "cancel": 0.6, "swing_time": 0.03, "hitstop": 0.14,
 		"cut": "horizontal", "unblockable": true, "power": 3.0,
 		"keys": [hilt,
@@ -153,7 +153,7 @@ static func _build() -> void:
 			key(0.62, Vector3(0.5, 1.18, -0.12), Vector3(0.9, 0.22, 0.36), Vector3(-0.36, 0.1, 0.93), 30.0, 10.0, 0.12, "inout")],
 	}
 	_cache["assassinate"] = {
-		"name": "assassinate", "duration": 1.25, "active": [0.3, 0.45], "damage": 999.0, "guard_damage": 999.0,
+		"name": "assassinate", "clip": "katana_assassinate", "duration": 1.25, "active": [0.3, 0.45], "damage": 999.0, "guard_damage": 999.0,
 		"step": 0.35, "step_window": [0.1, 0.3], "cancel": 1.2, "swing_time": 0.25, "hitstop": 0.12,
 		"cut": "thrust", "unblockable": true, "power": 2.0,
 		"keys": [g,

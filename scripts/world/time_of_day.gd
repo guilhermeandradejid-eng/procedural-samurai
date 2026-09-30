@@ -18,7 +18,7 @@ var _last_hour := -1
 const SUN_NOON := Color(1.0, 0.95, 0.88)
 const SUN_GOLD := Color(1.0, 0.72, 0.43)
 const SUN_HORIZON := Color(1.0, 0.44, 0.2)
-const MOON_COL := Color(0.58, 0.68, 0.95)
+const MOON_COL := Color(0.5, 0.62, 0.95)
 const FOG_DAY := Color(0.72, 0.78, 0.86)
 const FOG_GOLD := Color(0.98, 0.74, 0.52)
 const FOG_NIGHT := Color(0.07, 0.09, 0.15)
@@ -77,19 +77,22 @@ func apply() -> void:
 	sun.basis = Basis.looking_at(-sd, Vector3.UP if absf(sd.y) < 0.99 else Vector3.FORWARD)
 	var sc := SUN_NOON.lerp(SUN_GOLD, golden).lerp(SUN_HORIZON, horizon)
 	sun.light_color = sc
-	var sun_e := smoothstep(-0.03, 0.1, elev) * lerpf(1.35, 2.1, smoothstep(0.1, 0.8, elev))
+	var sun_e := smoothstep(-0.03, 0.1, elev) * lerpf(1.2, 1.7, smoothstep(0.1, 0.8, elev))
 	sun_e *= lerpf(1.0, 0.28, storm)
 	sun.light_energy = sun_e
-	sun.visible = sun_e > 0.005
+	# Both lights stay enabled all day: the sky shader takes LIGHT0 as the sun and
+	# LIGHT1 as the moon, so hiding one would promote the other into its slot
+	# (the moon rendered as a daylight sun). Zero energy switches them off.
+	sun.visible = true
 	sun.shadow_enabled = sun_e > 0.02
 
 	# --- moon -----------------------------------------------------------------
 	var night := 1.0 - smoothstep(-0.2, 0.02, elev)
 	moon.basis = Basis.looking_at(-md, Vector3.UP if absf(md.y) < 0.99 else Vector3.FORWARD)
 	moon.light_color = MOON_COL
-	moon.light_energy = night * smoothstep(0.0, 0.2, md.y) * 0.42 * lerpf(1.0, 0.4, storm)
-	moon.visible = moon.light_energy > 0.005
-	moon.shadow_enabled = moon.visible and not sun.visible
+	moon.light_energy = night * smoothstep(0.0, 0.2, md.y) * 0.26 * lerpf(1.0, 0.4, storm)
+	moon.visible = true
+	moon.shadow_enabled = moon.light_energy > 0.02 and sun_e <= 0.02
 
 	# --- environment ----------------------------------------------------------
 	var fog_col := FOG_NIGHT.lerp(FOG_DAY, day).lerp(FOG_GOLD, golden * day * 0.8)
@@ -98,7 +101,7 @@ func apply() -> void:
 	env.fog_density = lerpf(0.00022, 0.00042, golden) + fog_extra * 0.003 + storm * 0.0009
 	env.fog_sun_scatter = lerpf(0.05, 0.35, golden) * day
 	env.ambient_light_energy = lerpf(0.55, 1.0, day)
-	env.tonemap_exposure = lerpf(1.9, 1.0, day) * lerpf(1.0, 1.15, storm)
+	env.tonemap_exposure = lerpf(1.55, 1.0, day) * lerpf(1.0, 1.15, storm)
 	if env.volumetric_fog_enabled:
 		env.volumetric_fog_density = lerpf(0.0012, 0.0032, golden) + fog_extra * 0.025 + storm * 0.004
 		env.volumetric_fog_albedo = fog_col.lerp(Color.WHITE, 0.5)
@@ -107,7 +110,8 @@ func apply() -> void:
 		sky_mat.set_shader_parameter("sky_energy", lerpf(0.6, 1.0, day))
 		sky_mat.set_shader_parameter("storm", storm)
 
-	RenderingServer.global_shader_parameter_set("sun_dir", sd if sun.visible else md)
-	RenderingServer.global_shader_parameter_set("sun_color", sc * sun_e if sun.visible else MOON_COL * moon.light_energy)
+	var sun_up := sun_e > 0.005
+	RenderingServer.global_shader_parameter_set("sun_dir", sd if sun_up else md)
+	RenderingServer.global_shader_parameter_set("sun_color", sc * sun_e if sun_up else MOON_COL * moon.light_energy)
 	RenderingServer.global_shader_parameter_set("fog_color", fog_col)
 	RenderingServer.global_shader_parameter_set("ambient_color", fog_col.lerp(Color(0.4, 0.5, 0.7), 0.5) * lerpf(0.25, 1.0, day))

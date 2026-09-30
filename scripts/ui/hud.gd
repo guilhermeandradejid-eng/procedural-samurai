@@ -27,8 +27,6 @@ var _last_hp := -1.0
 var combo_label: Label
 var _combo := 0
 var _combo_t := 0.0
-var kanji_label: Label
-var _kanji_tw: Tween
 var _interact: Interactable = null
 var _assassin: Enemy = null
 var _standoff_ok := false
@@ -97,14 +95,7 @@ func _ready() -> void:
 	UIKit.anchor(stats, Control.PRESET_TOP_RIGHT, -340, 20, -20, 220)
 	stats.visible = false
 	add_child(stats)
-	kanji_label = UIKit.label("", 240, "kanji", Color.WHITE, 0)
-	kanji_label.set_anchors_preset(Control.PRESET_CENTER)
-	UIKit.anchor(kanji_label, Control.PRESET_CENTER, -400, -230, 400, 60)
-	kanji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	kanji_label.pivot_offset = Vector2(400, 145)
-	kanji_label.modulate.a = 0.0
-	add_child(kanji_label)
-	combo_label = UIKit.label("", 54, "title", Color(1.0, 0.85, 0.3), 10)
+	combo_label = UIKit.label("", 34, "title", Color(1.0, 0.85, 0.3), 8)
 	UIKit.anchor(combo_label, Control.PRESET_TOP_RIGHT, -520, 150, -40, 230)
 	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	combo_label.pivot_offset = Vector2(480, 40)
@@ -112,13 +103,12 @@ func _ready() -> void:
 	Game.combo_hit.connect(func(_p: float) -> void:
 		_combo += 1
 		_combo_t = 3.2
-		if _combo >= 2:
-			combo_label.text = "%d GOLPES!" % _combo if _combo < 5 else "%d GOLPES!!" % _combo
-			combo_label.scale = Vector2.ONE * 1.5
+		if _combo >= 3:
+			combo_label.text = "%d golpes" % _combo
+			combo_label.scale = Vector2.ONE * 1.15
 			combo_label.modulate = Color(1.0, 0.85 - minf(_combo * 0.06, 0.6), 0.3, 1.0)
 			var tw := combo_label.create_tween()
 			tw.tween_property(combo_label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
-	Game.big_kanji.connect(show_kanji)
 	Game.banner.connect(show_banner)
 	Game.toast.connect(show_toast)
 	Game.detection_changed.connect(func(e: Node, v: float) -> void:
@@ -184,22 +174,6 @@ func _next_banner() -> void:
 	_banner_t = 0.0
 	if b.style in ["victory", "reward"]:
 		Audio.play("banner", -6.0)
-
-
-func show_kanji(text: String, color: Color, duration: float) -> void:
-	kanji_label.text = text
-	kanji_label.add_theme_color_override("font_color", color)
-	kanji_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	kanji_label.add_theme_constant_override("outline_size", 14)
-	kanji_label.add_theme_font_size_override("font_size", 250 if text.length() == 1 else 190)
-	if _kanji_tw:
-		_kanji_tw.kill()
-	kanji_label.modulate.a = 1.0
-	kanji_label.scale = Vector2.ONE * 1.7
-	kanji_label.rotation = randf_range(-0.06, 0.06)
-	_kanji_tw = create_tween().set_parallel(true)
-	_kanji_tw.tween_property(kanji_label, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_kanji_tw.tween_property(kanji_label, "modulate:a", 0.0, 0.35).set_delay(maxf(duration - 0.35, 0.2))
 
 
 func show_toast(text: String) -> void:
