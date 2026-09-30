@@ -4,9 +4,10 @@ extends Node3D
 ## godot --headless --path . res://tests/hit_test.tscn
 ## env TRACE=player/light_1 TRACE_DIST=1.5 prints the blade path frame by frame;
 ## env BLOCK=1 makes the dummy keep its guard up.
+## env ONLY=player/counter,player/iai runs just those moves.
 
 const CASES := [
-	["player", "katana", ["light_1", "light_2", "light_3", "heavy", "counter"]],
+	["player", "katana", ["light_1", "light_2", "light_3", "heavy", "counter", "iai"]],
 	["ronin", "katana", ["light_1", "light_2", "light_3", "enemy_heavy"]],
 	["leader", "nodachi", ["light_1", "light_2", "light_3", "enemy_heavy"]],
 	["brute", "kanabo", ["smash", "sweep"]],
@@ -34,8 +35,11 @@ func _ready() -> void:
 	ground.add_child(cs)
 	add_child(ground)
 	Game.set_state(Game.State.PLAYING)
+	var only := OS.get_environment("ONLY").split(",", false)
 	for c in CASES:
 		for mv in c[2]:
+			if not only.is_empty() and not ("%s/%s" % [c[0], mv]) in only:
+				continue
 			if trace != "":
 				if "%s/%s" % [c[0], mv] == trace:
 					_queue.append({"style": c[0], "move": mv, "dist": float(OS.get_environment("TRACE_DIST")) if OS.get_environment("TRACE_DIST") != "" else 1.5, "side": 0.0})
@@ -118,6 +122,11 @@ func _physics_process(_delta: float) -> void:
 		var hand: Vector3 = inv * (a.body.parts["hand_r"] as Node3D).global_position
 		var tipw: Vector3 = a.weapon.tip() - t.global_position
 		print("d=%.2f step=%.2f yaw=%.0f " % [Vector2(a.global_position.x - t.global_position.x, a.global_position.z - t.global_position.z).length(), a.attack_step, rad_to_deg(a.rotation.y)], "t=%.2f sweep=%s grip=%s tip=%s hand=%s hand_tgt=%s str=%.2f tip_to_target=%.2f" % [a.action_time, a.weapon.sweeping, _v(gripl), _v(tipl), _v(hand), _v(tgl), a.body.strength, Vector2(tipw.x, tipw.z).length()])
+		if OS.get_environment("TRACE_TARGET") != "":
+			var parts := []
+			for pn in ["head", "chest", "belly", "upper_arm_r", "upper_arm_l"]:
+				parts.append("%s %s" % [pn, _v(inv * (t.body.parts[pn] as Node3D).global_position)])
+			print("   target ", " | ".join(parts))
 		if OS.get_environment("TRACE_BLADE") != "":
 			var gw: Transform3D = a.animator.grip_world(Transform3D(a.global_basis.orthonormalized(), a.global_position))
 			var bd_anim: Vector3 = a.global_basis.inverse() * gw.basis.y

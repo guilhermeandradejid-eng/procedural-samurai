@@ -31,6 +31,11 @@ O esqueleto do KayKit (T-pose, cabeça grande) é aplicado ao rig chibi de 16 pa
 * **contatos dos pés** vêm da altura e velocidade dos tornozelos; o instante do golpe
   (`meta.strike`) é o pico de velocidade da ponta da lâmina (ou o alcance máximo, nas estocadas).
 
+Também dá para assar um ciclo de andar/correr do KayKit (`kaykit.py cycle <clipe> <animação>`), começando
+no apoio do pé direito e com a velocidade nativa medida. Foi comparado com a captura do DeepMimic no boneco
+chibi e a captura ficou: o andar e o correr do KayKit deixam os braços abertos demais para essas
+proporções, enquanto a captura balança os braços de forma natural.
+
 ## Como o jogo usa os clipes
 
 * `MotionClip` / `MotionPose` (GDScript): amostragem por frame com slerp; cada clipe guarda a posição
@@ -45,8 +50,14 @@ O esqueleto do KayKit (T-pose, cabeça grande) é aplicado ao rig chibi de 16 pa
     dobra no mesmo plano do clipe (o eixo do joelho vem da coxa do clipe, não da posição do joelho);
   * braços: FK do clipe, ou IK de duas juntas até a empunhadura de duas mãos;
   * cabeça: olhar para o alvo por cima do clipe.
-* `AttackLibrary` guarda só a parte de jogo de cada golpe (dano, janela ativa, avanço, `hit_reach`);
-  o clipe traz a pose. O instante do golpe do clipe é alinhado ao meio da janela ativa.
+* `AttackLibrary` guarda só a parte de jogo de cada golpe (dano, janela ativa, avanço, `hit_reach`,
+  `aim_yaw`); o clipe traz a pose. O instante do golpe do clipe é alinhado ao meio da janela ativa.
+  `aim_yaw` (graus, positivo = esquerda) vira o corpo um pouco para o lado quando o clipe corta fora do
+  eixo do corpo (o contra-ataque é um talho da mão direita).
+* Acerto: a cada quadro físico seis pontos da lâmina lançam raios entre a posição anterior e a atual, e
+  mais dois raios de cada lado da superfície varrida (a lâmina tem espessura: 11 cm para o jogador,
+  5 cm para os inimigos). Sem isso, um golpe horizontal passava pelo vão entre o pescoço e o ombro.
+  `tests/hit_test.tscn` mostra a matriz de acertos por distância (`ONLY=player/counter` filtra).
 
 ## Corpo físico
 

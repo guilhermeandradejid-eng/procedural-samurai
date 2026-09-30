@@ -38,6 +38,9 @@
   "charge": [
    "sfx/charge_0.ogg"
   ],
+  "charged": [
+   "sfx/charged_0.ogg"
+  ],
   "clash": [
    "sfx/clash_0.ogg",
    "sfx/clash_1.ogg",

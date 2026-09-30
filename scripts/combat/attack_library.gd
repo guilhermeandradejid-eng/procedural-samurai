@@ -132,7 +132,7 @@ static func _build() -> void:
 	_cache["counter"] = {   # answer after a deflect: a fast rising diagonal
 		"name": "counter", "clip": "katana_counter", "duration": 0.5, "active": [0.08, 0.23], "damage": 34.0, "guard_damage": 40.0,
 		"step": 0.85, "step_window": [0.0, 0.16], "cancel": 0.34, "swing_time": 0.06, "hitstop": 0.1,
-		"cut": "diagonal_up", "power": 1.65,
+		"cut": "diagonal_up", "power": 1.65, "aim_yaw": 11.0, "hit_reach": 1.15,
 		"keys": [g,
 			key(0.05, Vector3(0.26, 0.86, -0.1), Vector3(0.6, -0.6, -0.5), Vector3(0.2, -0.1, -0.97), 26.0, 4.0, 0.12, "out"),
 			key(0.14, Vector3(0.05, 1.2, -0.56), Vector3(0.1, 0.35, -0.93), Vector3(-1.0, 0.0, 0.12), 0.0, 8.0, 0.08, "in"),

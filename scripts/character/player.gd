@@ -24,6 +24,7 @@ var resolve_charge := 0.0
 var counter_window := 0.0
 var heavy_hold := 0.0
 var charging := false
+var _charge_full := false
 var combat_timer := 0.0
 var _buf_light := 0.0
 var _buf_heavy_release := false
@@ -170,6 +171,7 @@ func _handle_combat_input(delta: float, dir: Vector3, mag: float) -> void:
 	if Input.is_action_just_pressed("attack_heavy") and action in ["", "block"] and not disarmed:
 		charging = true
 		heavy_hold = 0.0
+		_charge_full = false
 		if not weapon_drawn:
 			draw_weapon(true)
 		attack = AttackLibrary.get_attack("heavy_charge")
@@ -177,10 +179,14 @@ func _handle_combat_input(delta: float, dir: Vector3, mag: float) -> void:
 		Audio.play_at("charge", global_position, -8.0)
 	if charging:
 		heavy_hold += delta
-		if heavy_hold > 0.35:
-			weapon.glint(Color(1.0, 0.8, 0.45), clampf(heavy_hold / 1.1, 0.0, 1.0))
+		var level := clampf((heavy_hold - 0.15) / 0.85, 0.0, 1.0)
+		weapon.charge(level)
+		if level >= 1.0 and not _charge_full:
+			_charge_full = true
+			_charge_pop()
 		if not Input.is_action_pressed("attack_heavy") or heavy_hold > 1.6:
 			charging = false
+			weapon.charge(0.0)
 			var power := clampf(heavy_hold / 1.0, 0.35, 1.0)
 			start_attack("heavy")
 			attack = attack.duplicate()
@@ -217,6 +223,15 @@ func _handle_combat_input(delta: float, dir: Vector3, mag: float) -> void:
 		set_action("heal", 1.0)
 		Audio.play("heal", -2.0)
 		resolve_changed.emit(resolve, resolve_charge)
+
+
+## Full charge: the blade flashes, a ring snaps out of it and the picture pinches for a beat.
+func _charge_pop() -> void:
+	var p := weapon.tip()
+	Audio.play_at("charged", p, -3.0, 0.02)
+	FX.shockwave(p, Color(1.0, 0.82, 0.5), 0.55)
+	FX.sparks(p, Vector3.UP, 0.5)
+	Game.radial_blur.emit(0.014 * float(Settings.get_value("combat_fx", 1.0)), p, 0.16)
 
 
 func _find_target(max_dist: float, min_dot: float, prefer_dir := Vector3.ZERO) -> Character:
@@ -337,7 +352,9 @@ func receive_hit(info: Dictionary) -> String:
 		Game.player_damaged.emit(float(info.get("damage", 0.0)), info.get("dir", Vector3.FORWARD))
 		Game.shake(0.5)
 		cam_rig.kick_fov(-5.0)
-		charging = false
+		if charging:
+			charging = false
+			weapon.charge(0.0)
 	elif r == "blocked":
 		Game.shake(0.2)
 	return r

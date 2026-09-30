@@ -237,6 +237,21 @@ def charge(seed):
     return normalize(fade(y + hum), 0.7)
 
 
+def charged(seed):
+    """A heavy strike reaching full charge: a rising shimmer that lands in a bright bell 'shing'."""
+    dur = 1.0
+    rise = sweep_filter(white(0.18, seed), exp_glide(1800, 9000, 0.18), 4.0) * env_points(0.18, [(0, 0), (0.16, 1.0), (0.18, 0)])
+    bell = modal(0.8, [(1760, 1.0, 0.55), (2637, 0.6, 0.45), (3520, 0.45, 0.35), (5274, 0.25, 0.25)], seed)
+    thump = sine(exp_glide(150, 55, 0.3), 0.3) * np.exp(-t_axis(0.3) / 0.09)
+    y = np.zeros(int(dur * SR))
+    y = place(y, rise * 0.7, 0.0)
+    y = place(y, bell * 0.6, 0.16)
+    y = place(y, thump * 0.8, 0.16)
+    y = place(y, _strike(0.2, seed + 1, 3000, 14000, 0.004) * 0.9, 0.16)
+    y = reverb_mono(y, 0.25, 1.0, seed)[: int(1.1 * SR)]
+    return normalize(fade(y, 0.001, 0.25), 0.8)
+
+
 def glint(seed):
     """Red glint: the telegraphed unblockable (a sharp 'ting' with shimmer)."""
     dur = 1.0
@@ -454,7 +469,7 @@ SFX = {
     "guard_break": (guard_break, 2), "flesh_cut": (flesh_cut, 5), "dismember": (dismember, 3),
     "death_grunt": (death_grunt, 5), "scream": (scream, 3), "alert_shout": (alert_shout, 3), "huh": (huh, 3),
     "body_fall": (body_fall, 3), "land": (land, 2), "step": (step, 6), "jump": (jump, 2), "roll": (roll, 2),
-    "sword_draw": (sword_draw, 2), "sword_sheathe": (sword_sheathe, 2), "charge": (charge, 1), "glint": (glint, 1),
+    "sword_draw": (sword_draw, 2), "sword_sheathe": (sword_sheathe, 2), "charge": (charge, 1), "charged": (charged, 1), "glint": (glint, 1),
     "perfect": (perfect, 1), "resolve": (resolve, 1), "heal": (heal, 1), "shrine_bell": (shrine_bell, 1),
     "banner": (banner, 1), "victory_sting": (victory_sting, 1), "ui_move": (ui_move, 1), "ui_select": (ui_select, 1),
     "map_open": (map_open, 1), "guiding_wind": (guiding_wind, 1), "blood_splat": (blood_splat, 3),

@@ -645,3 +645,86 @@ func afterimage(ch: Node3D, color := Color(0.55, 0.8, 1.0), life := 0.34, alpha 
 	tw.tween_callback(func() -> void:
 		_ghosts_alive -= 1
 		root.queue_free())
+
+
+# ------------------------------------------------------------------ charge glow
+
+var _mat_embers: ParticleProcessMaterial
+var _ember_mesh: QuadMesh
+var _ember_mat: StandardMaterial3D
+
+
+func _setup_embers() -> void:
+	if _mat_embers != null:
+		return
+	_setup()
+	# a soft round dot, additive, so a swarm of them reads as heat
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.add_point(0.3, Color(1, 1, 1, 0.6))
+	g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 64
+	gt.height = 64
+	_ember_mat = StandardMaterial3D.new()
+	_ember_mat.albedo_texture = gt
+	_ember_mat.albedo_color = Color(2.6, 1.8, 0.9)
+	_ember_mat.vertex_color_use_as_albedo = true
+	_ember_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ember_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_ember_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ember_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	_ember_mesh = QuadMesh.new()
+	_ember_mesh.size = Vector2(0.09, 0.09)
+	_mat_embers = ParticleProcessMaterial.new()
+	_mat_embers.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	_mat_embers.direction = Vector3(0, 1, 0)
+	_mat_embers.spread = 180.0
+	_mat_embers.initial_velocity_min = 0.05
+	_mat_embers.initial_velocity_max = 0.45
+	_mat_embers.gravity = Vector3(0, 1.3, 0)
+	_mat_embers.damping_min = 0.6
+	_mat_embers.damping_max = 1.6
+	_mat_embers.scale_min = 0.4
+	_mat_embers.scale_max = 1.2
+	var sc := Curve.new()
+	sc.add_point(Vector2(0, 0.5))
+	sc.add_point(Vector2(0.25, 1.0))
+	sc.add_point(Vector2(1, 0.0))
+	var sct := CurveTexture.new()
+	sct.curve = sc
+	_mat_embers.scale_curve = sct
+	var cg := Gradient.new()
+	cg.set_color(0, Color(1.0, 0.95, 0.75, 1.0))
+	cg.set_color(1, Color(1.0, 0.35, 0.08, 0.0))
+	var cgt := GradientTexture1D.new()
+	cgt.gradient = cg
+	_mat_embers.color_ramp = cgt
+
+
+## A looping emitter of glowing embers inside a box (`centre`, `half` in `parent`'s space), used along a
+## blade while a strike charges. The caller drives `emitting` and `amount_ratio`.
+func ember_emitter(parent: Node3D, centre: Vector3, half: Vector3, color := Color(1.0, 0.8, 0.45)) -> GPUParticles3D:
+	_setup_embers()
+	var p := GPUParticles3D.new()
+	p.amount = 72
+	p.lifetime = 0.8
+	p.explosiveness = 0.0
+	p.local_coords = false
+	p.emitting = false
+	var mat := _mat_embers.duplicate() as ParticleProcessMaterial
+	mat.emission_box_extents = half
+	p.process_material = mat
+	p.draw_pass_1 = _ember_mesh
+	var dot := _ember_mat.duplicate() as StandardMaterial3D
+	dot.albedo_color = Color(color.r * 2.8, color.g * 2.8, color.b * 2.8)
+	p.material_override = dot
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-4, -4, -4), Vector3(8, 8, 8))
+	parent.add_child(p)
+	p.position = centre
+	return p

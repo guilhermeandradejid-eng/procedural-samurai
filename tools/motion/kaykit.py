@@ -392,6 +392,40 @@ def bake(name, src, anim, fps=FPS, sword="2H_Sword", grip="sword", left=1.0, loo
     return path, r
 
 
+def bake_cycle(name, src, anim, out_dir=None, travel=None, drop_last=True):
+    """A looping gait: foot contacts from the (in-place) motion of the feet against the speed the
+    ground scrolls at, ground calibration, start on the right-foot strike, native speed."""
+    import build_all
+    r = retarget(src, anim)
+    pel = r["pelvis_pos"]
+    rot = r["rot"]
+    if drop_last:
+        pel, rot = pel[:-1], rot[:-1]
+    rig = mo_rig.Rig()
+    pw, _ = rig.fk(pel, rot)
+    T = len(pel)
+    if travel is None:
+        # the planted foot slides backwards under the body at the speed the ground scrolls at
+        vs = []
+        for n in ("foot_r", "foot_l"):
+            a = pw[:, IDX[n]]
+            low = a[:, 1] < a[:, 1].min() + 0.035
+            vz = np.gradient(a[:, 2]) * FPS
+            vs.extend(vz[low])
+        travel = float(np.median(vs)) if vs else 1.0
+        travel = max(travel, 0.3)
+    import locomotion
+    for _ in range(3):
+        flags = locomotion.contacts_from(pel, rot, FPS, travel)
+        sp = locomotion.native_speed(pel, rot, flags, FPS)
+        if sp > 0.2:
+            travel = sp
+    pose = {"pelvis_pos": pel.copy(), "rot": rot.copy()}
+    pose_b, flags, speed = build_all.bake_pose_cycle(name, pose, FPS, travel=travel, calibrate=True)
+    print("%-12s <- %-22s %d frames, speed %.2f rig u/s" % (name, anim, T, speed))
+    return speed
+
+
 # name -> bake options. Katana moves use the two-handed sword animations (the sword becomes our katana,
 # both hands stay on the hilt); the one-handed ones get the left hand added.
 CLIPS = {
@@ -435,3 +469,5 @@ if __name__ == "__main__":
             print("%-34s %.2fs" % (n, a["duration"]))
     elif cmd == "build":
         build(sys.argv[2:] or None)
+    elif cmd == "cycle":          # cycle <clip name> <animation>: bake a gait under that name
+        bake_cycle(sys.argv[2], Source(), sys.argv[3])

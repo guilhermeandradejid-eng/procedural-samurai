@@ -30,26 +30,50 @@ float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-// Droplets on the lens: xy = refraction offset, z = drop mask. Drops swell
-// and slowly slide down; `slip` speeds the slide (blood runs faster).
-vec3 lens_drops(vec2 uv, float aspect, float t, float seed, float cells, float size, float slip) {
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+// Droplets on the lens: xy = refraction offset, z = drop mask. Drops swell, then run down the glass
+// leaving a trail above them; `slip` speeds the slide (blood runs faster). `wear` (0..1) shrinks the
+// drops away and `cluster` (0..1) makes the coverage patchy, with lumpy outlines and a small
+// satellite drop, the way a splash lands.
+vec3 lens_drops(vec2 uv, float aspect, float t, float seed, float cells, float size, float slip, float wear, float cluster) {
 	vec2 p = uv * vec2(aspect, 1.0) * cells;
 	vec2 id = floor(p);
 	vec2 f = fract(p) - 0.5;
 	float h1 = hash(id + seed);
 	float h2 = hash(id * 1.7 + seed + 4.3);
 	float h3 = hash(id * 2.3 + seed + 9.1);
+	float pat = mix(1.0, smoothstep(0.3, 0.7, vnoise(id * 0.45 + seed * 3.1)), cluster);
+	float w = smoothstep(0.0, 0.5, wear * pat);
 	float life = fract(t * (0.02 + 0.03 * h2) * slip + h1);
-	float y_off = -smoothstep(0.55, 1.0, life) * 0.45;
-	vec2 c = vec2((h1 - 0.5) * 0.5, (h2 - 0.5) * 0.35 + y_off);
-	float r = size * (0.22 + 0.4 * h3) * (0.4 + 0.6 * smoothstep(0.0, 0.25, life));
+	// screen y grows downwards: the drop runs down and its trail stays above it
+	float run = smoothstep(0.55, 1.0, life) * 0.28;
+	vec2 c = vec2((h1 - 0.5) * 0.4, (h2 - 0.5) * 0.2 - 0.12 + run);
+	float r = size * (0.22 + 0.4 * h3) * (0.4 + 0.6 * smoothstep(0.0, 0.25, life)) * (1.0 - smoothstep(0.88, 1.0, life)) * w;
+	float keep = step(h3, mix(0.7, 0.5, cluster));
 	vec2 q = (f - c) * vec2(1.0, 0.85);
-	float d = length(q);
-	float m = smoothstep(r, r * 0.55, d) * step(h3, 0.7);
-	// a thin streak above the drop while it slides
-	float streak = smoothstep(r * 0.35, 0.0, abs(f.x - c.x)) * step(c.y, f.y) * step(f.y, c.y + 0.35 * smoothstep(0.55, 0.8, life)) * 0.35 * step(h3, 0.7);
+	float lump = 1.0;
+	if (cluster > 0.0) {
+		float ang = atan(q.y, q.x);
+		lump += cluster * (0.2 * sin(3.0 * ang + h1 * 6.283) + 0.12 * sin(5.0 * ang + h2 * 6.283) + 0.07 * sin(9.0 * ang + h3 * 6.283));
+	}
+	float m = smoothstep(r, r * 0.55, length(q) / lump) * keep * step(0.004, r);
+	float trail = smoothstep(r * 0.3, 0.0, abs(f.x - c.x)) * step(f.y, c.y) * step(c.y - run, f.y) * smoothstep(c.y - run - 0.002, c.y, f.y) * 0.4 * keep;
 	vec2 off = -(q / max(r, 1e-3)) * m;
-	return vec3(off, clamp(m + streak, 0.0, 1.0));
+	if (cluster > 0.0) {
+		vec2 c2 = c + (vec2(h2, h1) - 0.5) * 0.5;
+		float r2 = r * 0.42;
+		vec2 q2 = f - c2;
+		float m2 = smoothstep(r2, r2 * 0.55, length(q2)) * keep * step(0.004, r2);
+		m = max(m, m2);
+		off -= (q2 / max(r2, 1e-3)) * m2;
+	}
+	return vec3(off, clamp(m + trail, 0.0, 1.0));
 }
 
 void fragment() {
@@ -58,12 +82,13 @@ void fragment() {
 	vec3 wet = vec3(0.0);
 	vec3 gore = vec3(0.0);
 	if (lens_rain > 0.01) {
-		wet = lens_drops(uv, aspect, TIME, 1.0, 9.0, 0.36, 1.0) * lens_rain;
-		wet += lens_drops(uv, aspect, TIME, 7.0, 5.5, 0.42, 0.7) * lens_rain * 0.7;
+		wet = lens_drops(uv, aspect, TIME, 1.0, 9.0, 0.36, 1.0, 1.0, 0.0) * lens_rain;
+		wet += lens_drops(uv, aspect, TIME, 7.0, 5.5, 0.42, 0.7, 1.0, 0.0) * lens_rain * 0.7;
 	}
 	if (lens_blood > 0.01) {
-		gore = lens_drops(uv, aspect, TIME, 3.0, 7.0, 0.45, 2.2) * lens_blood;
-		gore += lens_drops(uv, aspect, TIME, 11.0, 11.0, 0.4, 1.6) * lens_blood * 0.8;
+		// big splatters and a finer spray, patchy rather than even; they shrink away as the blood wears off
+		gore = lens_drops(uv, aspect, TIME, 3.0, 4.5, 0.6, 2.2, lens_blood, 1.0);
+		gore += lens_drops(uv, aspect, TIME, 11.0, 9.0, 0.5, 1.6, lens_blood, 1.0) * 0.8;
 		gore.z = smoothstep(0.25, 0.6, gore.z);
 	}
 	uv += (wet.xy + gore.xy) * 0.03;
@@ -100,7 +125,9 @@ void fragment() {
 	}
 	// lens water brightens at the edges; blood tints and darkens what is behind
 	col += vec3(0.9, 0.95, 1.0) * clamp(wet.z, 0.0, 1.0) * 0.06;
-	col = mix(col, lens_tint * (0.5 + 0.5 * col), clamp(gore.z, 0.0, 1.0) * 0.85);
+	// blood: darker at the heart of a drop, lighter where the glass thins out at its rim
+	float rim = clamp(length(gore.xy), 0.0, 1.0);
+	col = mix(col, lens_tint * (0.5 + 0.5 * col) * mix(0.7, 1.3, rim * rim), clamp(gore.z, 0.0, 1.0) * 0.88);
 	float l = dot(col, vec3(0.299, 0.587, 0.114));
 	// low health / slow motion drain the colour (keeps the reds a bit)
 	float drain = max(low_health * 0.55, focus * 0.4);

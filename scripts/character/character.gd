@@ -282,6 +282,7 @@ func _move(delta: float) -> void:
 				var tt := attack_target.global_position - global_position
 				if tt.length_squared() > 0.04:
 					target_yaw = atan2(-tt.x, -tt.z)
+			target_yaw += deg_to_rad(float(attack.get("aim_yaw", 0.0)))
 		rotation.y = lerp_angle(rotation.y, target_yaw, clampf(rate * delta, 0.0, 1.0))
 	# keep the body from being left behind if the capsule got teleported
 	if global_position.distance_squared_to(body.parts["pelvis"].global_position) > 36.0 and not dead:
@@ -423,6 +424,10 @@ func aim_attack_at(target: Character) -> void:
 	attack_step_window = Vector2(minf(sw[0], strike * 0.3), maxf(strike - 0.03, 0.05))
 	if to.length() > 0.2:
 		face_dir = to.normalized()
+		# some clips swing to one side of the body: turn a little (degrees, positive = left) so the cut lands on the target
+		var aim := float(attack.get("aim_yaw", 0.0))
+		if aim != 0.0:
+			rotation.y = atan2(-to.x, -to.z) + deg_to_rad(aim)
 
 
 ## Distance between the two characters at which the current move cuts best.

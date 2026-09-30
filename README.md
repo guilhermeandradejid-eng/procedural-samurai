@@ -10,8 +10,9 @@ lago, litoral e o vulcão Ezo-Fuji. Mundo, texturas, modelos 3D e **todos os son
 > Combate cheio de *game juice*: golpes com câmera lenta, aparos perfeitos, fatiamento de verdade
 > (o corte segue o plano da lâmina e mostra o interior), desmembramento, sangue por todo lado, cabeças que
 > quicam com um sonoro **BOING!**, e um pouco de *Devil May Cry*: cada golpe corta o vento (crescente de
-> ar que distorce a imagem), deixa imagens residuais nos avanços, e os golpes fortes borram a tela e
-> "racham" a imagem — sem textos na tela atrapalhando a cena.
+> ar que distorce a imagem), deixa imagens residuais nos avanços, o golpe pesado acumula brasas e luz na
+> lâmina enquanto você segura o botão, e os golpes fortes borram a tela e "racham" a imagem — sem textos
+> na tela atrapalhando a cena.
 
 ## Como jogar
 
@@ -58,10 +59,12 @@ godot --path . -- --play   # pula a tela de título
 * **Combate**: combos, carga, bloqueio/aparo, rolamento com i-frames, ímã de golpe, atordoamento,
   desmembramento e **fatiamento por plano** com shader de corte. Efeitos à la *Devil May Cry*: crescente
   de vento com refração, fita de ar atrás da lâmina, imagens residuais, desfoque radial, linhas de
-  velocidade e o "corte" que racha a tela nos golpes fortes (opções: *Efeitos de combate* e
-  *Desfoque de movimento*).
+  velocidade, o "corte" que racha a tela nos golpes fortes, brasas e luz na lâmina durante a carga do golpe
+  pesado (com anel e som ao chegar no máximo) e sangue na lente que escorre e some (opções: *Efeitos de
+  combate* e *Desfoque de movimento*). As lâminas varrem um volume com espessura, então o golpe que
+  encosta visualmente no alvo acerta.
 * **IA**: percepção por visão/ruído, alerta em grupo, fichas de ataque (poucos atacam por vez), fintas,
-  golpes telegrafados (brilho vermelho = imbloqueável), fuga, patrulhas.
+  golpes telegrafados (lâmina em brasa vermelha = imbloqueável), fuga, patrulhas.
 * **Áudio 100 % sintetizado**: espadas, carne, vozes, sinos, taiko + shakuhachi + koto, ambientes.
 * **Interface**: HUD com pincelada, indicadores de detecção (o golpe imbloqueável ganha um triângulo de
   alerta vermelho em vez de texto), mapa de pergaminho, pausa, opções, morte.

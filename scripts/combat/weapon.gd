@@ -8,6 +8,8 @@ extends Node3D
 signal struck(target: Node, part: String, point: Vector3, direction: Vector3)
 
 const HIT_MASK := RagdollBody.LAYER_ALIVE
+const EDGE_HALF := 0.055     # half the thickness (m) of the slab a swing sweeps through (the player's)
+const EDGE_HALF_FOE := 0.025    # the enemies' slab is a bit thinner: their swings should be earned
 
 var kind := "katana"
 var ch: Node3D
@@ -29,6 +31,9 @@ var _last_tip_ok := false
 var _prev_pts: Array[Vector3] = []
 var _query := PhysicsRayQueryParameters3D.new()
 var _glint := 0.0
+var _charge_fx: GPUParticles3D
+var _charge_light: OmniLight3D
+var _charge_ttl := 0.0
 var data := {}
 
 
@@ -131,6 +136,7 @@ func drop(impulse := Vector3.ZERO) -> void:
 	dropped = true
 	in_hand = false
 	sweeping = false
+	charge(0.0)
 	var xf := global_transform
 	var rb := RigidBody3D.new()
 	rb.mass = float(data.get("mass", 1.2))
@@ -222,7 +228,40 @@ func glint(color: Color, strength := 1.0) -> void:
 	blade_mat.set_shader_parameter("glint_color", color)
 
 
+## Charge-up glow: embers along the blade, a warm light and a steel glint that swell with `level` (0..1).
+## Call it every frame while charging, and once with 0 to stop.
+func charge(level: float, color := Color(1.0, 0.8, 0.45)) -> void:
+	if level <= 0.0 and _charge_fx == null:
+		return
+	var k := float(Settings.get_value("combat_fx", 1.0))
+	var on := level > 0.02 and in_hand and not dropped
+	if _charge_fx == null:
+		var a: float = data.get("blade_start", 0.05)
+		var b: float = data.get("blade_end", 0.75)
+		_charge_fx = FX.ember_emitter(self, Vector3(0, (a + b) * 0.5, 0), Vector3(0.05, (b - a) * 0.5, 0.05), color)
+		_charge_light = OmniLight3D.new()
+		_charge_light.omni_range = 3.4
+		_charge_light.light_energy = 0.0
+		_charge_light.shadow_enabled = false
+		add_child(_charge_light)
+		_charge_light.position = Vector3(0, (a + b) * 0.5, 0.0)
+	_charge_fx.emitting = on and k > 0.01
+	_charge_fx.amount_ratio = clampf(level, 0.1, 1.0)
+	_charge_light.visible = on
+	# a caller that stops calling (interrupted, dead) must not leave the glow burning
+	_charge_ttl = 0.2 if on else 0.0
+	if on:
+		var flicker := 0.88 + 0.12 * sin(Time.get_ticks_msec() * 0.031)
+		_charge_light.light_color = color
+		_charge_light.light_energy = level * 2.0 * clampf(k, 0.0, 1.5) * flicker
+		glint(color, level * flicker)
+
+
 func physics_update(delta: float) -> void:
+	if _charge_ttl > 0.0:
+		_charge_ttl -= delta
+		if _charge_ttl <= 0.0:
+			charge(0.0)
 	if _glint > 0.0:
 		_glint = maxf(0.0, _glint - delta * 1.6)
 		blade_mat.set_shader_parameter("glint", _glint)
@@ -243,6 +282,9 @@ func physics_update(delta: float) -> void:
 		pts = blade_points(6, true)
 	var space := get_world_3d().direct_space_state
 	var n := pts.size()
+	var along := pts[n - 1] - pts[0]
+	along = along.normalized() if along.length_squared() > 1e-6 else Vector3.UP
+	var half_edge := (EDGE_HALF if int(ch.get("team")) == 0 else EDGE_HALF_FOE) * body.scale_factor
 	for i in n:
 		if _prev_pts.size() != n:
 			break
@@ -250,19 +292,28 @@ func physics_update(delta: float) -> void:
 		var to := pts[i]
 		if from.distance_squared_to(to) < 1e-6:
 			continue
-		_query.from = from
-		_query.to = to
-		var hit := space.intersect_ray(_query)
-		if hit.is_empty():
-			continue
-		var col: Object = hit.collider
-		if not col.has_meta("character"):
-			continue
-		var target: Node = col.get_meta("character")
-		if target == ch or hit_set.has(target):
-			continue
-		hit_set[target] = true
-		struck.emit(target, String(col.get_meta("part")), hit.position, (to - from).normalized())
+		# a blade has some thickness: cast on both sides of the surface it sweeps too, so a swing
+		# cannot slip through the gap between a neck and a shoulder
+		var slab := (to - from).cross(along)
+		var shifts: Array[Vector3] = [Vector3.ZERO]
+		if slab.length_squared() > 1e-8:
+			var nrm := slab.normalized() * half_edge
+			shifts.append(nrm)
+			shifts.append(-nrm)
+		for shift in shifts:
+			_query.from = from + shift
+			_query.to = to + shift
+			var hit := space.intersect_ray(_query)
+			if hit.is_empty():
+				continue
+			var col: Object = hit.collider
+			if not col.has_meta("character"):
+				continue
+			var target: Node = col.get_meta("character")
+			if target == ch or hit_set.has(target):
+				continue
+			hit_set[target] = true
+			struck.emit(target, String(col.get_meta("part")), hit.position, (to - from).normalized())
 	# also test the blade itself this frame (thrusts / point-blank)
 	_query.from = pts[0]
 	_query.to = pts[n - 1]

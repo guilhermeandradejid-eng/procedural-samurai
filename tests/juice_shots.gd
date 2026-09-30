@@ -103,8 +103,61 @@ func _spawn() -> void:
 	foe.process_mode = Node.PROCESS_MODE_INHERIT
 
 
+func _shot(file: String) -> void:
+	get_tree().paused = true
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/%s.png" % [out_dir, file])
+	get_tree().paused = false
+
+
+func _wait(seconds: float) -> void:
+	var t := 0.0
+	while t < seconds:
+		await get_tree().physics_frame
+		foe.state = Enemy.State.IDLE
+		foe.detection = 0.0
+		t += 1.0 / Engine.physics_ticks_per_second
+
+
+## Holding the heavy attack: embers and glow build up on the blade, a ring snaps out at full charge,
+## and an enemy's perilous wind-up glows red.
+func _charge_shots() -> void:
+	await _spawn()
+	player.combat_timer = 30.0     # keep the sword out
+	await _wait(0.4)
+	Input.action_press("attack_heavy")
+	var t := 0.0
+	var k := 0
+	for tt in [0.3, 0.6, 0.9, 1.02, 1.2]:
+		await _wait(tt - t)
+		t = tt
+		await _shot("charge_%d" % k)
+		k += 1
+	Input.action_release("attack_heavy")
+	await _wait(0.2)
+	await _shot("charge_release")
+	# the blood on the lens runs down and shrinks away
+	for i in 3:
+		await _wait(0.9)
+		await _shot("lens_%d" % i)
+	await _spawn()
+	player.combat_timer = 30.0
+	foe.draw_weapon(true)
+	await _wait(0.4)
+	k = 0
+	for lvl in [0.35, 0.7, 1.0]:
+		for i in 5:
+			foe.weapon.charge(lvl, Enemy.PERIL_COLOR)
+			await _wait(0.02)
+		await _shot("peril_%d" % k)
+		k += 1
+
+
 func _run() -> void:
 	await get_tree().create_timer(0.5).timeout
+	if "charge" in attacks:
+		await _charge_shots()
+		attacks.remove_at(attacks.find("charge"))
 	for name in attacks:
 		await _spawn()
 		for i in 25:

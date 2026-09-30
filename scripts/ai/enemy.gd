@@ -13,6 +13,8 @@ signal alerted(enemy: Enemy)
 
 enum State { IDLE, SUSPICIOUS, COMBAT, FLEE }
 
+const PERIL_COLOR := Color(1.0, 0.15, 0.06)
+
 var state := State.IDLE
 var aware := false
 var detection := 0.0
@@ -245,6 +247,8 @@ func _combat(delta: float, player: Player) -> void:
 	# telegraph before an attack (weapon raised, optional red glint)
 	if _pending_attack != "":
 		_tell_left -= delta
+		if _perilous:
+			weapon.charge(clampf(1.0 - _tell_left / 0.55, 0.0, 1.0), PERIL_COLOR)
 		move_dir = dir
 		move_speed = 1.2 if d > _attack_range() else 0.0
 		if _tell_left <= 0.0:
@@ -301,6 +305,7 @@ func _plan_attack() -> void:
 
 
 func _do_attack(name: String) -> void:
+	weapon.charge(0.0)
 	if not start_attack(name):
 		return
 	if name == "enemy_heavy" or _perilous:
@@ -411,6 +416,8 @@ func receive_hit(info: Dictionary) -> String:
 		become_aware(true)
 	if r == "hit" and _pending_attack != "":
 		_pending_attack = ""
+		_perilous = false
+		weapon.charge(0.0)
 	return r
 
 
